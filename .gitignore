@@ -1,0 +1,17 @@
+all_console_logs.log
+bans.txt
+cmd.txt
+customize/resource/*
+errors
+highscores.txt
+ladderlog.txt
+logs.html
+map.svg
+master.srv
+online_players.txt
+origin/
+players.txt
+scorelog.txt
+service_info.txt
+won_matches.txt
+won_rounds.txt
