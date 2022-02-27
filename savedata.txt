@@ -1,0 +1,4 @@
+dukevin@rx O:10:"PlayerStat":9:{s:7:"credits";i:723;s:5:"kills";i:318;s:6:"deaths";i:603;s:12:"roundsPlayed";i:246;s:13:"matchesPlayed";i:21;s:10:"matchesWon";i:4;s:4:"time";i:42214;s:5:"teles";i:3;s:9:"roundsWon";i:67;}
+player@forums O:10:"PlayerStat":9:{s:7:"credits";i:0;s:5:"kills";i:1;s:6:"deaths";i:0;s:12:"roundsPlayed";i:1;s:13:"matchesPlayed";i:0;s:10:"matchesWon";i:0;s:4:"time";i:20;s:5:"teles";i:0;s:9:"roundsWon";i:1;}
+word O:10:"PlayerStat":9:{s:7:"credits";i:15;s:5:"kills";i:25;s:6:"deaths";i:10;s:12:"roundsPlayed";i:28;s:13:"matchesPlayed";i:3;s:10:"matchesWon";i:3;s:4:"time";i:1941;s:5:"teles";i:0;s:9:"roundsWon";i:16;}
+bladee O:10:"PlayerStat":9:{s:7:"credits";i:7;s:5:"kills";i:16;s:6:"deaths";i:21;s:12:"roundsPlayed";i:38;s:13:"matchesPlayed";i:4;s:10:"matchesWon";i:1;s:4:"time";i:2169;s:5:"teles";i:0;s:9:"roundsWon";i:16;}
