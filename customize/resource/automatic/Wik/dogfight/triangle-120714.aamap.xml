@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="ISO-8859-1" standalone="no"?>
+<!DOCTYPE Resource SYSTEM "Wik/sty.dtd"> 
+<Resource type="aamap" author="Wik" category="dogfight" name="triangle" version="120714">
+<Map version="2">
+<World>
+<Field>
+<Spawn x="186.9" y="171.9" angle="270"/>
+<Spawn x="236.9" y="251.9" angle="90"/>
+<Spawn x="171.9" y="236.9" angle="180"/>
+<Spawn x="251.9" y="186.9" angle="0"/>
+<Spawn x="211.9" y="161.9" angle="270"/>
+<Spawn x="211.9" y="261.9" angle="90"/>
+<Spawn x="161.9" y="211.9" angle="180"/>
+<Spawn x="261.9" y="211.9" angle="0"/>
+<Spawn x="236.9" y="151.9" angle="270"/>
+<Spawn x="186.9" y="271.9" angle="90"/>
+<Spawn x="151.9" y="186.9" angle="180"/>
+<Spawn x="271.9" y="236.9" angle="0"/>
+<Wall>
+<Point x="0" y="268.6"/>
+<Point x="268.6" y="0"/>
+<Point x="367" y="367"/>
+<Point x="0" y="268.6"/>
+</Wall>
+</Field>
+</World>
+</Map>
+</Resource>

@@ -1,0 +1,1 @@
+/home/duke/aa/servers/sandwich/var/customize/config/aiplayers.cfg

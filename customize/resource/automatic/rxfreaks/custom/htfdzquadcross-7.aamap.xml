@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE Resource SYSTEM "AATeam/map-0.2.8.0.dtd">
+<!-- Author is SoulOfSet -->
+<Resource type="aamap" name="htfdzquadcross" version="7" author="rxfreaks" category="custom">
+ <Map version="2.8.0">
+	<Settings>
+		<Setting name="DELAY_COMMAND" value="1 SPAWN_ZONE death 250 250 15 0 20 0 true"/>
+		<Setting name="DELAY_COMMAND" value="1 SPAWN_ZONE death 250 250 15 0 -20 0 true"/>
+		<Setting name="DELAY_COMMAND" value="1 SPAWN_ZONE death 250 250 15 0 0 20 true"/>
+		<Setting name="DELAY_COMMAND" value="1 SPAWN_ZONE death 250 250 15 0 0 -20 true"/>
+		<Setting name="DELAY_COMMAND" value="1 SPAWN_ZONE flag param 250 250 5 0 0 0 true"/>
+	</Settings>
+			<World>
+				<Field>
+					<Spawn x="9" y="100" xdir="1" ydir="0"/>
+					<Spawn x="9" y="250" xdir="1" ydir="0"/>
+					<Spawn x="9" y="400" xdir="1" ydir="0"/>
+					<Spawn x="489" y="100" xdir="-1" ydir="0"/>
+					<Spawn x="489" y="250" xdir="-1" ydir="0"/>
+					<Spawn x="489" y="400" xdir="-1" ydir="0"/>
+					<Spawn x="100" y="11" xdir="0" ydir="1"/>
+					<Spawn x="250" y="11" xdir="0" ydir="1"/>
+					<Spawn x="400" y="11" xdir="0" ydir="1"/>
+					<Spawn x="100" y="491" xdir="0" ydir="-1"/>
+					<Spawn x="250" y="491" xdir="0" ydir="-1"/>
+					<Spawn x="400" y="491" xdir="0" ydir="-1"/>
+						<!--Outermost Wall-->
+								<Wall>
+									<Point x="0" y="0"/>
+									<Point x="0" y="500"/>
+									<Point x="500" y="500"/>
+									<Point x="500" y="0"/>
+									<Point x="0" y="0"/>
+								</Wall>
+						<!--Innermost Walls-->
+							<!--Bottom-->
+								<Wall height="2">
+									<Point x="200" y="150"/>
+									<Point x="300" y="150"/>
+								</Wall>
+						<!--Innermost Walls-->
+							<!--Top-->
+								<Wall height="2">
+									<Point x="200" y="350"/>
+									<Point x="300" y="350"/>
+								</Wall>
+						<!--Innermost Walls-->
+							<!--Right-->
+								<Wall height="2">
+									<Point x="350" y="200"/>
+									<Point x="350" y="300"/>
+								</Wall>
+						<!--Innermost Walls-->
+							<!--Left-->
+								<Wall height="2">
+									<Point x="150" y="200"/>
+									<Point x="150" y="300"/>
+								</Wall>
+				</Field>
+			</World>
+	</Map>
+</Resource>
