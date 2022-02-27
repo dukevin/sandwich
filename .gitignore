@@ -2,7 +2,7 @@ all_console_logs.log
 bans.txt
 cmd.txt
 customize/resource/*
-errors
+errors/
 highscores.txt
 ladderlog.txt
 logs.html
@@ -15,3 +15,6 @@ scorelog.txt
 service_info.txt
 won_matches.txt
 won_rounds.txt
+remote control.html
+ladder.txt
+savedata.txt
