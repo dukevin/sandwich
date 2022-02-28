@@ -1,7 +1,8 @@
 #!/usr/bin/php
 <?php
 /* Requires to be started with SPAWN_SCRIPT so getenv works. +ap required*/
-/* Todo: disco fog, fort mode zones don't spawn, reg fort with base res, spec stay in $players*/
+/* Bugs: Team games don't award the team, some fort mode zones don't spawn like tele zones, spectators stay in $players arr*/
+/* To add: disco fog mode, ball team killing, reg fort with base res, kill streak rewards, add bounties*/
 $dir = "/home/duke/aa/servers/sandwich/var/";
 $dessertRounds = 10;	//serve dessert (play a minigame) after this many rounds
 $pink = "0xffa0e0";
@@ -158,7 +159,7 @@ while(!feof(STDIN))
 				continue;
 			$game->playlist($p[2]);
 		}
-		else if($p[1] == "/a" || $p[1] == "/t" || $p[1] == "/c")
+		else if($p[1] == "/a" || $p[1] == "/c")
 		{
 			$game->cur_game->playercmd($p[2]);
 		}
@@ -192,6 +193,7 @@ while(!feof(STDIN))
 		}
 		else if(!is_a($game->cur_game, "None") && ($roundsPlayed-1) % $dessertRounds == 0)
 		{
+			pm("dukevin@rx","Unsetting game ".$p[0]);
 			unset($game->cur_game, $next_game);
 			$game->cur_game = new None();
 		}
@@ -282,8 +284,6 @@ while(!feof(STDIN))
 	}
 	if($p[0] == "MATCH_ENDED")
 	{
-		if($roundsPlayed % $dessertRounds != 0)
-			$game->endGame();
 		foreach($playerStat as $i=>&$ps)
 			$ps->matchesPlayed++;
 		foreach($players as $i=>$_)
@@ -1115,7 +1115,7 @@ class Teams extends Minigame
 class Turbo extends Minigame
 {
 	static $display_name = "Turbo Button";
-	static $description = "Press brakes (v) to boost";
+	static $description = "Press brakes (v) to boost. The zones speed you up";
 	function __construct()
 	{
 		$rand = mt_rand(10,40);
@@ -1169,7 +1169,7 @@ class Pets extends Minigame
 class Macro extends Minigame
 {
 	static $display_name = "Macro";
-	static $description = "Huge map, huge acceleration. Touch zones for speed";
+	static $description = "Huge map, huge acceleration. Zones speed you up";
 	function __construct()
 	{
 		$rand = mt_rand(1,3);
@@ -1236,6 +1236,7 @@ class Htf extends Minigame
 		undo("FLAG_HOLD_SCORE_TIME");
 		undo("CYCLE_ACCEL_RIM");
 		undo("RESPAWN_TIME");
+		undo("FLAG_HOLD_TIME");
 		s("MAP_FILE Anonymous/polygon/regular/square-1.0.1.aamap.xml");
 	}
 }
