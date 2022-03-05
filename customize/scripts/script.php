@@ -1024,7 +1024,7 @@ class Wildfort extends Minigame
 		s("INCLUDE teams.cfg");
 		s("INCLUDE fort.cfg");
 		s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
-		$line = explode("|",Fort::$maps[mt_rand(0,sizeof(Fort::$maps)-1)]);
+		$line = explode("|",Wildfort::$maps[mt_rand(0,sizeof(Wildfort::$maps)-1)]);
 		foreach($line as $i => $l)
 		{
 			$l = trim($l);
