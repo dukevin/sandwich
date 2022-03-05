@@ -63,8 +63,9 @@ while(!feof(STDIN))
 			if(empty($p[5]) || !in_array($p[5], GameManager::$games_list)) {
 				if(!empty($p[5]))
 					pm($p[2], "0xff8080Error: Invalid minigame name.");
-				pm($p[2], "List of available minigames: ".implode(", ",GameManager::$games_list));
-				pm($p[2], "Usage: /order <minigame>");
+				pm($p[2], "List of available minigames:");
+				GameManager::listGames($p[2], "order");
+				pm($p[2], "Usage: /order <minigame>   0x808080(Press PAGE UP on your keyboard to scroll up)");
 				continue;
 			}
 			if(Shop::buy($p[2], $p[1])) {
@@ -76,8 +77,9 @@ while(!feof(STDIN))
 			if(empty($p[5]) || !in_array($p[5], GameManager::$games_list)) {
 				if(!empty($p[5]))
 					pm($p[2], "0xff8080Error: Invalid minigame name.");
-				pm($p[2], "List of available minigames: ".implode(", ",GameManager::$games_list));
-				pm($p[2], "Usage: /buffet <minigame>");
+				pm($p[2], "List of available minigames:");
+				GameManager::listGames($p[2], "buffet");
+				pm($p[2], "Usage: /buffet <minigame>   0x808080(Press PAGE UP on your keyboard to scroll up)");
 				continue;
 			}
 			if(Shop::buy($p[2], $p[1])) {
@@ -548,6 +550,8 @@ class Bounty
 	function announce()
 	{
 		global $pink, $players, $gry;
+		if($this->amount == 0)
+			$this->amount = 1;
 		$plur = $this->amount == 1 ? "" : "s";
 		c("WANTED! There is a bounty on ".$players[$this->target]."{$gry} for {$pink}\$".$this->amount."{$gry} credit{$plur}!");
 		pm($this->target, "Survive this bounty for {$pink}\$".(1)."{$gry} credit");
@@ -697,6 +701,27 @@ class GameManager
 				pm($player, $pink." | 0x808080Done - 0xa0a0a0".$g);
 		}
 	}
+	public static function listGames($player, $cmd = null)
+	{
+		global $gry;
+		$width = 84; //width of screen in chars
+		if($cmd)
+			$cmd = "0xffffff/".$cmd;
+		foreach(GameManager::$games_list as $g)
+		{
+			$pre = "$cmd $g ";
+			$sub = str_repeat(" ",27-strlen($pre)).$gry." : ".$g::$display_name;
+			$desc = explode("0x", $g::$description)[0];
+			$end = "  (".trim($desc);
+			if(strlen($pre.$sub.$end) >= $width)
+				$end = substr($end,0,$width-strlen($pre.$sub.$end))."...)";
+			else
+				$end .= ")";
+			pm($player, $pre."0xffffff".$sub."0x808080".$end." ");
+			usleep(10000);
+		}
+		usleep(100000);
+	}
 }
 
 abstract class Minigame
@@ -790,7 +815,7 @@ class Axes extends Minigame
 class Collecting extends Minigame
 {
 	static $display_name = "Coin Collecting";
-	static $description = "Collect enough coins for points 0x808080(5 coins = 1 pt)";
+	static $description = "Collect the moving zones for points 0x808080(5 coins = 1 pt)";
 	private $coins;
 	function __construct() 
 	{
@@ -924,7 +949,7 @@ class Map extends Minigame
 class Wildfort extends Minigame
 {
 	static $display_name = "Wild Fort";
-	static $description = "Team-based fortress with wacky maps"; 
+	static $description = "Capture the enemy's base on a wacky map"; 
 	static $maps = array(
 		"Abductors		| map_file Wik/fortress/Abductors_sty-200614.aamap.xml		| cycle_accel_rim 5 | Rim acceleration. Teleporters might abduct you.",
 		"And180SomeMore	| map_file Wik/fortress/And180SomeMore-050913.aamap.xml		| cycle_accel 0 | cycle_brake_refill 1 | cycle_speed 6 | cycle_speed_decay_above 0 | cycle_start_speed 10 | cycle_turn_speed_factor 1.05 | Turn to gain speed.",
@@ -1152,7 +1177,7 @@ class Koh extends Minigame
 class Bots extends Minigame
 {
 	static $display_name = "Bot Invasion";
-	static $description = "There's a lot of bots who want you dead 0x808080(0 pts for kills, 5 pts for surviving)";
+	static $description = "Survive the bot onslaught 0x808080(0 pts for kills, 5 pts for surviving)";
 	function __construct()
 	{
 		$num_ais = mt_rand(5, 21);
@@ -1416,7 +1441,7 @@ class Htf extends Minigame
 class Ctf extends Minigame
 {
 	static $display_name = "Capture the Flag";
-	static $description = "Team based CTF! 0x808080(Flag capture = 15pts)";
+	static $description = "Take the opponent's flag and bring it home 0x808080(Flag capture = 15pts)";
 	function __construct()
 	{
 		s("INCLUDE teams.cfg");
@@ -1431,7 +1456,7 @@ class Ctf extends Minigame
 class Bombs extends Minigame
 {
 	static $display_name = "Bomb Laying";
-	static $description = "Press brakes (v) to leave a bomb 0x808080(Bomb kills = 3 pts, regular kills = 0 pts)";
+	static $description = "Leave a bomb by pressing brakes (v) 0x808080(Bomb kills = 3 pts, regular kills = 0 pts)";
 	function __construct()
 	{
 		s("INCLUDE bombs.cfg");
@@ -1463,7 +1488,7 @@ function readLadder($p)
 {
 	global $dir;
 	$lf = file($dir."ladder.txt");
-	$scores = ["None",0,0,0];
+	$scores = ["None",0,0,0,-1,0,-1,0];
 	$scores[3] = count($lf);
 	foreach($lf as $i=>$l)
 	{
@@ -1473,20 +1498,24 @@ function readLadder($p)
 		}
 	}
 	$lf = file($dir."won_rounds.txt");
+	$scores[5] = count($lf);
 	foreach($lf as $i=>$l)
 	{
 		$a = preg_split('/\s\s+/', $l);
 		if(trim($a[1]) == $p) {
+			$scores[4] = $i+1;
 			$scores[1] = $a[0];
 			break;
 		}
 	}
 	$lf = file($dir."won_matches.txt");
+	$scores[7] = count($lf);
 	foreach($lf as $i=>$l)	
 	{
 		$a = preg_split('/\s\s+/', $l);
 		if(trim($a[1]) == $p) {
 			$scores[2] = $a[0];
+			$scores[6] = $i+1;
 			break;
 		}
 	}
