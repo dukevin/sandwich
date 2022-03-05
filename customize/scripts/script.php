@@ -235,7 +235,7 @@ while(!feof(STDIN))
 		if(!array_key_exists($p[2], $players))
 			continue;
 		$playerStat[$p[2]]->roundsWon++;
-		if(is_a($bounty, "Bounty") && $bounty->target) {
+		if($bounty && is_a($bounty, "Bounty") && $bounty->target) {
 			$bounty->survive();
 			$bounty = null;
 		}
@@ -359,7 +359,7 @@ while(!feof(STDIN))
 			{
 				killStreak($p[1], $p[2]);
 				$playerStat[$p[2]]->kills += 1;
-				if(is_a($bounty,"Bounty") && $bounty->target == $p[1]) {
+				if($bounty && is_a($bounty,"Bounty") && $bounty->target == $p[1]) {
 					$bounty->award($p[2]);
 					$bounty = null;
 				}
@@ -1071,6 +1071,7 @@ class Fort extends Minigame
 	function __construct()
 	{
 		s("INCLUDE fort.cfg");
+		s("INCLUDE teams.cfg");
 		s("SIZE_FACTOR -1");
 		s("SP_SIZE_FACTOR -1");
 		s("BASE_RESPAWN 1");
@@ -1081,6 +1082,7 @@ class Fort extends Minigame
 	function __destruct()
 	{
 		unload("fort.cfg");
+		unload("teams.cfg");
 		undo("SIZE_FACTOR");
 		undo("SP_SIZE_FACTOR");
 		undo("BASE_RESPAWN");
