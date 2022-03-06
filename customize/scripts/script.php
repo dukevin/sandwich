@@ -1,7 +1,7 @@
 #!/usr/bin/php
 <?php
 /* Requires to be started with SPAWN_SCRIPT so getenv works. +ap required*/
-/* Bugs: Team games don't award the team, some fort mode zones don't spawn like tele zones, spectators stay in $players arr*/
+/* Bugs: Some fort mode zones don't spawn like tele zones, spectators stay in $players arr or from logging in*/
 /* To add: disco fog mode, ball team killing*/
 $dir = "/home/duke/aa/servers/sandwich/var/";
 $dessertRounds = 10;	//serve dessert (play a minigame) after this many rounds
@@ -26,7 +26,10 @@ while(!feof(STDIN))
 		if($p[1] == "/stats" || $p[1] == "/stat" || $p[1] == "/s")
 		{
 			if(isset($p[5])) {
-				$search = closestMatch($p[5]);
+				$full_str = "";
+				for($i=5; $i < count($p); $i++)
+					$full_str .= trim($p[$i]." ");
+				$search = closestMatch($full_str);
 				printStats($p[2], true, $players[$search], $search);
 			}
 			else {
@@ -873,7 +876,7 @@ class Collecting extends Minigame
 		if($time > 100 && $time % 5 == 0) 
 		{
 			$speed = mt_rand(-100,100);
-			s("SPAWN_ZONE death ".mt_rand(10,490)." ".mt_rand(10,490)." 6 0 ".$speed." ".$speed." true 255 255 0 0 1");
+			s("SPAWN_ZONE death ".mt_rand(10,490)." ".mt_rand(10,490)." 6 0 ".$speed." ".$speed." true 255 0 0 0 1");
 		}
 	}
 	function targetZoneEnter($event)
