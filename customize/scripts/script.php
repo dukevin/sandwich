@@ -30,7 +30,7 @@ while(!feof(STDIN))
 				printStats($p[2], true, $players[$search], $search);
 			}
 			else {
-				c("0xRESETTHint: You can also search other players with /stats <name>");
+				pm($p[2], "0xRESETTHint: You can also search other players with /stats <name>");
 				printStats($p[2]);
 			}
 		}
@@ -1475,7 +1475,7 @@ function closestMatch($str)
 	$shortest = -1;
 	foreach($players as $i => $p)
 	{
-		$lev = levenshtein($str,$p);
+		$lev = levenshtein(strtolower($str),strtolower($p));
 		if($lev == 0)
 			return $str;
 		if($lev <= $shortest || $shortest < 0)
