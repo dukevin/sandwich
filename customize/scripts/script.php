@@ -2,7 +2,7 @@
 <?php
 /* Requires to be started with SPAWN_SCRIPT so getenv works. +ap required*/
 /* Bugs: Some fort mode zones don't spawn like tele zones, spectators stay in $players arr or from logging in*/
-/* To add: disco fog mode, ball team killing*/
+/* To add: disco fog mode, ball team killing, racing*/
 $dir = "/home/duke/aa/servers/sandwich/var/";
 $dessertRounds = 10;	//serve dessert (play a minigame) after this many rounds
 $pink = "0xffa0e0";
@@ -28,7 +28,8 @@ while(!feof(STDIN))
 			if(isset($p[5])) {
 				$full_str = "";
 				for($i=5; $i < count($p); $i++)
-					$full_str .= trim($p[$i]." ");
+					$full_str .= $p[$i];
+				$fill_str = trim($fill_str);
 				$search = closestMatch($full_str);
 				printStats($p[2], true, $players[$search], $search);
 			}
@@ -217,15 +218,13 @@ while(!feof(STDIN))
 		}
 		else
 		{
-			if($roundsPlayed % $dessertRounds == 0)
-				c($pink."Dessert time!");
-			else
-				c($pink.($dessertRounds-($roundsPlayed%$dessertRounds))."0xffffff more rounds until dessert");
+			c($pink.($dessertRounds-($roundsPlayed%$dessertRounds))."0xffffff more rounds until dessert");
 		}
 		foreach($playerStat as $i=>&$ps) {
 			$ps->time += $game_time;
 			$ps->roundsPlayed++;
 		}
+		$game->cur_game->roundEnd();
 	}
 	if($p[0] == "ROUND_COMMENCING") //ROUND_COMMENCING 6 10
 	{
@@ -268,10 +267,17 @@ while(!feof(STDIN))
 	if($p[0] == "PLAYER_ENTERED_GRID" || $p[0] == "PLAYER_RENAMED") //PLAYER_ENTERED_GRID uniquename 73.134.88.149 uniqueName //PLAYER_RENAMED uniquename dukevin@rx 73.134.88.149 1 uniqueName
 	{
 		$raw_name = $p[1];
-		$display_name = $p[3];
-		if($p[0] == "PLAYER_RENAMED") {
+		$display_name = "";
+		for($i=3; $i < count($p); $i++)
+			$display_name .= $p[$i]." ";
+		$display_name = trim($display_name);
+		if($p[0] == "PLAYER_RENAMED") 
+		{
 			$raw_name = $p[2];
-			$display_name = $p[5];
+			$display_name = "";
+			for($i=5; $i < count($p); $i++)
+				$display_name .= $p[$i]." ";
+			$display_name = trim($display_name);
 			if(array_key_exists($p[1], $players)) //don't write if a spectator renames
 				if(is_auth($p[1]) || $playerStat[$p[1]]->time > 600) //only write logged in with 600+
 					writePlayerToFile($p[1], $playerStat[$p[1]]);
@@ -734,6 +740,7 @@ abstract class Minigame
 	public function timedEvents($time) {}			//events that require time during the minigame
 	public function targetZoneEnter($arr) {}		//ladderlog event when a player hits a targetzone as an array
 	public function roundStart() {}					//triggered when the ROUND_COMMENCING event happens, good time to spawn zones
+	public function roundEnd() {}					//triggered when ROUND_FINIED|MATCH_ENDED, good time to pick new randoms for a buffet
 	public function playercmd($player) {pm($player, "This mode has no special action you can perform.");} //player typed /a
 	public function displayInfo() {
 		global $pink;
@@ -810,8 +817,13 @@ class Axes extends Minigame
 		s("ARENA_AXES ".$rand);
 		Axes::$description = "The axes have changed to ".$rand;
 	}
+	function roundEnd()
+	{
+		$this->__construct(); //pick new axes for buffets
+	}
 	function __destruct()
 	{
+		Axes::$description = "The axes have changed";
 		s("ARENA_AXES 4");
 	}
 }
@@ -942,6 +954,10 @@ class Map extends Minigame
 		if(++Map::$play >= sizeof(Map::$maps))
 			Map::$play = 0;
 	}
+	function roundEnd()
+	{
+		$this->__construct();
+	}
 	function __destruct()
 	{
 		Map::$cur_map = "none";
@@ -1054,6 +1070,10 @@ class Wildfort extends Minigame
 			c("0xbf00bfMap: ".$this->name);
 			c($this->hint);
 		}
+	}
+	function roundEnd()
+	{
+		$this->__construct();
 	}
 	function __destruct()
 	{
@@ -1349,13 +1369,17 @@ class Pets extends Minigame
 		global $players;
 		foreach($players as $i=>$p)
 			if(!is_numeric($i))
-				s("SPAWN_ZONE zombieOwner $i $i 250 250 10 0 0 0 false");
+				s("SPAWN_ZONE n $i zombieOwner $i $i 250 250 10 0 0 0 false");
 	}
 	function __destruct()
 	{
 		undo("SCORE_KILL");
 		undo("SCORE_ZOMBIE_ZONE");
 		undo("ZOMBIE_ZONE_SPEED");
+	}
+	function roundEnd()
+	{
+		c("HINT: Typing /a will reset your pet");
 	}
 	function timedEvents($time)
 	{
@@ -1365,6 +1389,11 @@ class Pets extends Minigame
 			s("ZOMBIE_ZONE_SPEED ".$this->speed);
 			c("Pet speed increased! (".$this->speed.")");
 		}
+	}
+	function playercmd($name)
+	{
+		s("COLLAPSE_ZONE $name");
+		s("SPAWN_ZONE n $name zombieOwner $name $name 250 250 10 0 0 0 false");
 	}
 }
 class Macro extends Minigame
