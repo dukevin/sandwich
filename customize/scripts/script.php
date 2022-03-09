@@ -1,7 +1,7 @@
 #!/usr/bin/php
 <?php
 /* Requires to be started with SPAWN_SCRIPT so getenv works. +ap required*/
-/* Bugs: Some fort mode zones don't spawn like tele zones, spectators stay in $players arr or from logging in*/
+/* Bugs: Some fort mode zones don't spawn like tele zones, spectators stay in $players arr*/
 /* To add: disco fog mode, ball team killing, racing*/
 $dir = "/home/duke/aa/servers/sandwich/var/";
 $dessertRounds = 10;	//serve dessert (play a minigame) after this many rounds
@@ -191,8 +191,8 @@ while(!feof(STDIN))
 		foreach($turbos as $i=>$t)
 			s("SET_CYCLE_SPEED $i ".($t*50));
 	}
-	if($p[0] == "TARGETZONE_PLAYER_ENTER") //TARGETZONE_PLAYER_ENTER 2 zonename 100 100 dukevin 90.8824 103.506 1 0 37.6366
-	{
+	if($p[0] == "TARGETZONE_PLAYER_ENTER" || $p[0] == "WINZONE_PLAYER_ENTER") 
+	{   //TARGETZONE_PLAYER_ENTER 2 zonename 100 100 dukevin 90.8824 103.506 1 0 37.6366
 		$game->cur_game->targetZoneEnter($p);
 	}
 	if($p[0] == "ROUND_FINISHED" || $p[0] == "MATCH_ENDED")
@@ -278,9 +278,16 @@ while(!feof(STDIN))
 			for($i=5; $i < count($p); $i++)
 				$display_name .= $p[$i]." ";
 			$display_name = trim($display_name);
-			if(array_key_exists($p[1], $players)) //don't write if a spectator renames
+			if(array_key_exists($p[1], $players)) //only write if player exists and...
+			{
 				if(is_auth($p[1]) || $playerStat[$p[1]]->time > 600) //only write logged in with 600+
 					writePlayerToFile($p[1], $playerStat[$p[1]]);
+			}
+			// else //don't put in player arr if a spectator renames (commented out because no event gets triggered for joining from spec)
+			// {
+			// 	c("debug: not putting in player arr '".$p[1]."'' not found in '".implode(",",array_keys($players))."'");
+			// 	continue;
+			// }
 			unset($players[$p[1]]);
 			unset($playerStat[$p[1]]);
 		}
@@ -435,6 +442,10 @@ function writePlayerToFile($player, $playerStat)
 		fopen($fname ,'w');
 		writePlayerToFile($player, $playerStat);
 	}
+	if(!is_a($playerStat, "PlayerStat")) {
+		c("Not overwriting save data with empty for $player");
+		return;
+	}
 	$lines = explode("\n", $contents);
 	foreach($lines as $i=>&$line)
 	{
@@ -463,7 +474,14 @@ function readPlayerFromFile($player)
 	{
 		$col = explode(" ",$line);
 		if($player == $col[0])
-			return unserialize($col[1]);
+		{
+			$ret = unserialize($col[1]);
+			if(!is_a($ret, "PlayerStat")) {
+				$ret = new PlayerStat();
+				c("Resetting corrupt savedata for $player");
+			}
+			return $ret;
+		}
 	}
 	return new PlayerStat();
 }
@@ -524,7 +542,7 @@ class Shop
 		}
 		$game = GameManager::getInstance();
 		$mode = $game->cur_game;
-		if(($cmd == "/speed" || $cmd == "/tel") && (is_a($mode,"htf") || is_a($mode,"ctf")))
+		if(($cmd == "/speed" || $cmd == "/tel") && (is_a($mode,"htf") || is_a($mode,"ctf") || is_a($mode,"reflex")))
 		{
 			pm($p, "You cannot purchase ".$cmd." during ".$mode::$display_name);
 			return false;
@@ -614,7 +632,7 @@ class GameManager
 {
 	private static $instance = null;
 	public $cur_game;
-	public static $games_list = ["shooting", "map", "axes", "sumo", "fort", "wildfort", "nano", "htf", "koh", "dz", "collecting", "turbo", "pets", "teams", "ctf", "macro", "bots", "longwall", "bone", "classic", "bombs"];
+	public static $games_list = ["shooting", "map", "axes", "sumo", "fort", "wildfort", "nano", "htf", "koh", "dz", "collecting", "turbo", "pets", "teams", "ctf", "macro", "bots", "longwall", "bone", "classic", "bombs", "reflex"];
 	private $games_available;
 
 	public function __construct()
@@ -673,7 +691,6 @@ class GameManager
 			s("WAIT_FOR_EXTERNAL_SCRIPT_TIMEOUT 4");
 			s("CENTER_MESSAGE ".$str::$display_name);
 			$this->cur_game = new $str();
-			$this->cur_game->roundStart(); //not needed, but makes it easier to debug by starting game prematurely
 		}
 		else {
 			if(empty($str)) {
@@ -941,18 +958,22 @@ class Map extends Minigame
 		{
 			s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
 			s("MAP_FILE rxfreaks/hft/".Map::$maps[Map::$play].".aamap.xml");
-			c("0xbf00bfMap0xffffff: $map_name[0] \n");
 			Map::$cur_map = $map_name[0];
+			c("0xbf00bfMap:0xffffff ".Map::$cur_map);
 		}
 		else
 		{
 			s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
 			s("MAP_FILE Wik/dogfight/".Map::$maps[Map::$play].".aamap.xml");
-			c("0xbf00bfMap: $map_name[0]\n");
 			Map::$cur_map = $map_name[0];
+			c("0xbf00bfMap0xffffff: ".Map::$cur_map);
 		}
 		if(++Map::$play >= sizeof(Map::$maps))
 			Map::$play = 0;
+	}
+	function roundStart()
+	{
+		c("0xbf00bfMap0xffffff: ".Map::$cur_map);
 	}
 	function roundEnd()
 	{
@@ -1064,12 +1085,10 @@ class Wildfort extends Minigame
 		c("0xbf00bfMap: ".$this->name);
 		c($this->hint);
 	}
-	function timedEvents($time)
+	function roundStart()
 	{
-		if($time == 0) {
-			c("0xbf00bfMap: ".$this->name);
-			c($this->hint);
-		}
+		c("0xbf00bfMap: ".$this->name);
+		c($this->hint);
 	}
 	function roundEnd()
 	{
@@ -1500,6 +1519,106 @@ class Bombs extends Minigame
 		unload("bombs.cfg");
 	}
 }
+class Reflex extends Minigame
+{
+	static $display_name = "Reflex Challenge";
+	static $description = "Test your reflexes by racing to the finish 0x808080(1st = 15 pts, 2nd = 10 pts, 3rd = 7 pts, Finishing = 4 pts)";
+	static $play = 0;
+	public $cur_map;
+	public $settings = [];
+	private $winners = [];
+	private $timer = 300;
+	static $maps = [
+		"Reflex Tunnel | rxfreaks/race/tunnel-6.aamap.xml | SIZE_FACTOR -7 | SP_SIZE_FACTOR -7",
+		"Spiral | rxfreaks/race/spiral-9.aamap.xml | SIZE_FACTOR -5 | SP_SIZE_FACTOR -5",
+		"3mazes | Light/race/3mazes-1.0.2.aamap.xml| SIZE_FACTOR -3 | SP_SIZE_FACTOR -3",
+		"ZigZag | Light/race/zigzag-1.0.2.aamap.xml| SIZE_FACTOR -4 | SP_SIZE_FACTOR -4",
+		"DoubleBind | rxfreaks/race/doublebind-1.aamap.xml| SIZE_FACTOR -6 | SP_SIZE_FACTOR -6",
+		"Maze | Light/race/dungeon-1.0.1.aamap.xml | SIZE_FACTOR -6 | SP_SIZE_FACTOR -6"
+	];
+	function __construct()
+	{
+		s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
+		s("INCLUDE reflex.cfg");
+		if(Reflex::$play == 0)
+			shuffle(Reflex::$maps);
+		$ar = explode("|", Reflex::$maps[Reflex::$play]);
+		$this->cur_map = trim($ar[0]);
+		for($i=1; $i<count($ar); $i++)
+		{
+			if($i==1)
+				s("MAP_FILE ".trim($ar[$i]));
+			else {
+				$this->settings[] = trim($ar[$i]);
+				s(trim($ar[$i]));
+			}
+		}
+		if(++Reflex::$play >= sizeof(Reflex::$maps))
+			Reflex::$play = 0;
+	}
+	function roundStart()
+	{
+		c("0xbf00bfMap0xffffff: ".$this->cur_map);
+		unset($this->winners);
+		$this->winners = [];
+		$this->timer = 300;
+	}
+	function roundEnd()
+	{
+		$this->__construct();
+	}
+	function timedEvents($time)
+	{
+		if(count($this->winners) <= 0 || $this->timer == 0)
+			return;
+		$this->timer--;
+		s("CENTER_MESSAGE ".$this->timer.'s'.str_repeat(" ", 20));
+		if($this->timer <= 0)
+			s("DECLARE_ROUND_WINNER ".$this->winners[0]);
+	}
+	function targetZoneEnter($e)     //TARGETZONE_PLAYER_ENTER 1  31 650 dukevin@rx 42.4338 622.168 0 1 23.8931
+	{								 //WINZONE_PLAYER_ENTER    1  464 40 dukevin@rx 460.553 38.2499 0 1 53.0025
+		global $players, $gry;
+		$winner = $e[5];
+		if(in_array($winner, $this->winners))
+			return;
+		$this->winners[] = $winner;
+		$time = array_pop($e);
+		if(count($this->winners) == 1)
+		{
+			c($players[$winner].$gry." finished the reflex challenge 1st [".$time."s]! (15 pts)");
+			s("ADD_SCORE_PLAYER ".$winner." 15");
+			$this->timer = round($time);
+		}
+		else if(count($this->winners) == 2)
+		{
+			c($players[$winner].$gry." finished the reflex challenge 2nd [".$time."s]! (10 pts)");
+			s("ADD_SCORE_PLAYER ".$winner." 10");
+		}
+		else if(count($this->winners) == 3)
+		{
+			c($players[$winner].$gry." finished the reflex challenge 3rd [".$time."s]! (7 pts)");
+			s("ADD_SCORE_PLAYER ".$winner." 7");
+		}
+		else
+		{
+			c($players[$winner].$gry." finished the reflex challenge ".count($this->winners)."th [".$time."s]! (4 pts)");
+			s("ADD_SCORE_PLAYER ".$winner." 4");
+		}
+		if(count($this->winners) == count($players)) {
+			s("DECLARE_ROUND_WINNER ".$this->winners[0]);
+			$this->timer = 0;
+		}
+	}
+	function __destruct()
+	{
+		unload("reflex.cfg");
+		$this->cur_map = "";
+		s("MAP_FILE Anonymous/polygon/regular/square-1.0.1.aamap.xml");
+		foreach($this->settings as $s)
+			undo(explode(" ",$s)[0]);
+	}
+}
 
 function closestMatch($str)
 {
@@ -1507,7 +1626,7 @@ function closestMatch($str)
 	$shortest = -1;
 	foreach($players as $i => $p)
 	{
-		$lev = levenshtein(strtolower($str),strtolower($p));
+		$lev = levenshtein(strtolower($str),strtolower(strip0x($p)));
 		if($lev == 0)
 			return $str;
 		if($lev <= $shortest || $shortest < 0)
@@ -1554,6 +1673,12 @@ function readLadder($p)
 		}
 	}
 	return $scores;
+}
+function strip0x($str)
+{
+	if($str === false)
+		return false;
+	return preg_replace('/0x[0-9a-fA-F]{6}/', '', $str);
 }
 function is_admin($p, $warn = true)
 {
