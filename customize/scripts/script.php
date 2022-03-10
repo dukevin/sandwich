@@ -274,8 +274,8 @@ while(!feof(STDIN))
 		$display_name = implode(" ",array_splice($p, 3));
 		if($p[0] == "PLAYER_RENAMED") 
 		{
-			if(!array_key_exists($p[1], $players)) //if oldname is not in player array, we can assume they renamed as spectator
-				continue; //BUG: see above
+			if(!array_key_exists($p[1], $players)) //if oldname is not in player array, we can assume they renamed as a spectator who entered as one
+				continue;
 			if(is_auth($p[2])) //a user logged in - handle it in PLAYER_LOGIN event
 				continue;
 			$raw_name = $p[2];
@@ -308,8 +308,7 @@ while(!feof(STDIN))
 	{
 		if(!array_key_exists($p[1], $players)) //only add colored name if the person is in the players array
 			continue;
-		$raw_name = $p[1];
-		$players[$raw_name] = implode(" ",array_splice($p,2));
+		$players[$p[1]] = implode(" ",array_splice($p,2));
 	}
 	if($p[0] == "PLAYER_LEFT")
 	{
@@ -1674,10 +1673,13 @@ function readLadder($p)
 	}
 	return $scores;
 }
-function readLadderTop($p)
+function readAndPrintTopLadder($p, $s) //$p = player requesting, $s = search
 {
 	global $dir;
+	$width = 84;
 	$lf = file($dir."ladder.txt");
+	$color = "0xffff00";
+	//WIP
 }
 function strip0x($str)
 {
