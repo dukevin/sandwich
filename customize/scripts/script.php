@@ -40,7 +40,7 @@ while(!feof(STDIN))
 		}
 		else if($p[1] == "/shop")
 			Shop::view($p[2]);
-		else if($p[1] == "/res" || $p[1] == "/r" || $p[1] == "/respawn" || $p[1] == "/rse")
+		else if($p[1] == "/res" || $p[1] == "/r" || $p[1] == "/respawn" || $p[1] == "/rse" || $p[1] == "//res")
 		{
 			$p[1] = "/res";
 			if(Shop::buy($p[2],$p[1])) 
@@ -58,6 +58,10 @@ while(!feof(STDIN))
 		}
 		else if($p[1] == "/now") 
 		{
+			if( ($dessertRounds-($roundsPlayed%$dessertRounds)) == 1 ) {
+				pm($p[2], "Next round is already dessert, be patient!");
+				continue;
+			}
 			if(Shop::buy($p[2], $p[1])) {
 				c($players[$p[2]]." {$gry}buys early dessert! (Next round is dessert)");
 				$roundsPlayed = 9;
@@ -69,11 +73,11 @@ while(!feof(STDIN))
 					pm($p[2], "0xff8080Error: Invalid minigame name.");
 				pm($p[2], "List of available minigames:");
 				GameManager::listGames($p[2], "order");
-				pm($p[2], "Usage: /order <minigame>   0x808080(Press PAGE UP on your keyboard to scroll up)");
+				pm($p[2], "Usage: /order <minigame>   0xRESETT(Press PAGE UP on your keyboard to scroll up)");
 				continue;
 			}
 			if(Shop::buy($p[2], $p[1])) {
-				c($players[$p[2]]." {$gry}orders ".$p[5]::$display_name." for the next dessert! (in ".($dessertRounds-($roundsPlayed%$dessertRounds))." rounds)");
+				c($players[$p[2]]." {$gry}orders {$pink}".$p[5]::$display_name."{$gry} for the next dessert! (in ".($dessertRounds-($roundsPlayed%$dessertRounds))." rounds)");
 				$next_game = [$p[2], $p[5]];
 			}
 		}
@@ -83,11 +87,11 @@ while(!feof(STDIN))
 					pm($p[2], "0xff8080Error: Invalid minigame name.");
 				pm($p[2], "List of available minigames:");
 				GameManager::listGames($p[2], "buffet");
-				pm($p[2], "Usage: /buffet <minigame>   0x808080(Press PAGE UP on your keyboard to scroll up)");
+				pm($p[2], "Usage: /buffet <minigame>   0xRESETT(Press PAGE UP on your keyboard to scroll up)");
 				continue;
 			}
 			if(Shop::buy($p[2], $p[1])) {
-				c($players[$p[2]]." {$gry}orders ".$p[5]::$display_name." for the rest of the match!");
+				c($players[$p[2]]." {$gry}orders all-you-can-eat {$pink}".$p[5]::$display_name."{$gry} for 10 rounds!");
 				$roundsPlayed = 1;
 				$game->pickGame($p[2], $p[5]);
 			}
@@ -122,6 +126,10 @@ while(!feof(STDIN))
 			pm($name, "0xRESETT".$playerStat[$name]->teles." teles remaining.");
 			s("TELEPORT ".$name." ".$cmd);
 			c($players[$name]." {$gry}teleports!");
+		}
+		else if($p[1] == "/a" || $p[1] == "/c")
+		{
+			$game->cur_game->playercmd($p[2]);
 		}
 		else if($p[1] == "/play" || $p[1] == "/mode")
 		{
@@ -173,10 +181,6 @@ while(!feof(STDIN))
 			if(!is_admin($p))
 				continue;
 			$game->playlist($p[2]);
-		}
-		else if($p[1] == "/a" || $p[1] == "/c")
-		{
-			$game->cur_game->playercmd($p[2]);
 		}
 		else {
 			pm($p[2], "Invalid command ".$p[1].", try: 0xffffff/stats /shop /res /now /order /buffet /speed /tel /a");
@@ -244,7 +248,6 @@ while(!feof(STDIN))
 	}
 	if($p[0] == "ROUND_STARTED")
 	{
-		$game->cur_game->roundStart();
 		if(!is_a($game->cur_game, "None"))
 			$game->cur_game->displayInfo();
 		else
@@ -263,37 +266,41 @@ while(!feof(STDIN))
 			}
 			c("0xffffff# 0xffaa92Be 0xaf5617s0xd39d59a0x86b325n0x789919d0xd12e15w0xa2548ei0xffb830c0xc27938h0xd2883fe0xd39d59d0xRESETT: 0xa0a0a0".$blurb);
 		}
+		$game->cur_game->roundStart();
 	}
 	if($p[0] == "PLAYER_ENTERED_GRID" || $p[0] == "PLAYER_RENAMED") //PLAYER_ENTERED_GRID uniquename 73.134.88.149 uniqueName //PLAYER_RENAMED uniquename dukevin@rx 73.134.88.149 1 uniqueName
-	{
+	{ //BUG: A spectator who joins does not get added to the player array (no +ap event is fired)
 		$raw_name = $p[1];
-		$display_name = "";
-		for($i=3; $i < count($p); $i++)
-			$display_name .= $p[$i]." ";
-		$display_name = trim($display_name);
+		$display_name = implode(" ",array_splice($p, 3));
 		if($p[0] == "PLAYER_RENAMED") 
 		{
+			if(!array_key_exists($p[1], $players)) //if oldname is not in player array, we can assume they renamed as spectator
+				continue; //BUG: see above
+			if(is_auth($p[2])) //a user logged in - handle it in PLAYER_LOGIN event
+				continue;
 			$raw_name = $p[2];
-			$display_name = "";
-			for($i=5; $i < count($p); $i++)
-				$display_name .= $p[$i]." ";
-			$display_name = trim($display_name);
+			if($p[4] == 0) //user is not logged in 
+				pm($raw_name, "You are not logged in so renaming caused you to lose your stats since they are tied to your display name instead.");
+			$display_name = implode(" ",array_splice($p, 5));
 			if(array_key_exists($p[1], $players)) //only write if player exists and...
 			{
-				if(is_auth($p[1]) || $playerStat[$p[1]]->time > 600) //only write logged in with 600+
+				if($p[4] == 1 || $playerStat[$p[1]]->time > 600) //only write logged in with 600+
 					writePlayerToFile($p[1], $playerStat[$p[1]]);
 			}
-			// else //don't put in player arr if a spectator renames (commented out because no event gets triggered for joining from spec)
-			// {
-			// 	c("debug: not putting in player arr '".$p[1]."'' not found in '".implode(",",array_keys($players))."'");
-			// 	continue;
-			// }
 			unset($players[$p[1]]);
 			unset($playerStat[$p[1]]);
 		}
 		$players[$raw_name] = "";
 		$playerStat[$raw_name] = readPlayerFromFile($raw_name);
 		printStats($raw_name, false, $display_name);
+	}
+	if($p[0] == "PLAYER_LOGIN") //PLAYER_LOGIN dog_water dukevin@rx
+	{
+		$players[$p[2]] = "";
+		$playerStat[$p[2]] = readPlayerFromFile($p[2]);
+		printStats($p[2], false, $players[$p[1]]);
+		unset($players[$p[1]]);
+		unset($playerStat[$p[1]]);
 	}
 	if($p[0] == "PLAYER_AI_ENTERED")
 		$ais[] = $p[1];
@@ -302,9 +309,7 @@ while(!feof(STDIN))
 		if(!array_key_exists($p[1], $players)) //only add colored name if the person is in the players array
 			continue;
 		$raw_name = $p[1];
-		array_shift($p);
-		array_shift($p);
-		$players[$raw_name] = implode(" ",$p);
+		$players[$raw_name] = implode(" ",array_splice($p,2));
 	}
 	if($p[0] == "PLAYER_LEFT")
 	{
@@ -324,45 +329,29 @@ while(!feof(STDIN))
 	}
 	if($p[0] == "MATCH_ENDED")
 	{
-		foreach($playerStat as $i=>&$ps)
-			$ps->matchesPlayed++;
 		foreach($players as $i=>$_)
 			printStats($i);
 		//show ladder scores
 	}
-	if($p[0] == "MATCH_WINNER") //MATCH_WINNER uniquename dukevin@rx
+	if($p[0] == "MATCH_WINNER") //MATCH_WINNER uniquename dukevin@rx MATCH_WINNER bananas hardleft stephen
 	{
-		if(!array_key_exists($p[2], $players))
-			continue;
-		if(sizeof($p) > 3) //it was a team game
-		{
-			foreach($players as $i=>$_)
-			{
-				if(in_array($i, $p)) {
-					c("0xffffff# ".$players[$i]."0x00ffff earns {$pink}\$5 0x00fffffor being on the winning team!");
-					$playerStat[$i]->credits += 5;
-					$playerStat[$i]->matchesWon++;
-					$playerStat[$i]->roundsWon++;
-				}
-				else {
-					pm($i, "0xRESETTYou earned {$pink}\$1 0xRESETTcredit for participating. Spend credits by typing {$gry}/shop");
-					$playerStat[$i]->credits += 1;
-				}
-				
-			}
-			continue;
-		}
-		c("0xffffff# ".$players[$p[2]]."0x00ffff earns {$pink}\$5 0x00ffffcredits for winning!");
-		$playerStat[$p[2]]->credits += 5;
+		$winners = array_splice($p, 2);		
 		foreach($players as $i=>$_)
 		{
-			if($i == $p[2]) {
+			$playerStat[$i]->matchesPlayed++;
+			if(in_array($i, $winners))
+			{
+				$reason = count($winners) == 1 ? "winning!" : "being on the winning team!";
+				c("0xffffff# ".$players[$i]."0x00ffff earns {$pink}\$5 0x00ffffcredits for ".$reason);
+				$playerStat[$i]->credits += 5;
 				$playerStat[$i]->matchesWon++;
 				$playerStat[$i]->roundsWon++;
-				continue;
 			}
-			$playerStat[$i]->credits += 1;
-			pm($i, "0xRESETTYou earned {$pink}\$1 0xRESETTcredit for participating. Spend credits by typing {$gry}/shop");
+			else
+			{
+				pm($i, "0xRESETTYou earned {$pink}\$1 0xRESETTcredit for participating. Spend credits by typing {$gry}/shop");
+				$playerStat[$i]->credits += 1;
+			}
 		}
 	}
 	if(preg_match("/^DEATH_FRAG|DEATH_ZOMBIEZONE|DEATH_SHOT_FRAG|DEATH_DEATHZONE|DEATH_SHOT_SUICIDE|DEATH_RUBBERZONE/", $line))
@@ -370,7 +359,7 @@ while(!feof(STDIN))
 		if(!array_key_exists($p[1], $playerStat))
 			continue;
 		$playerStat[$p[1]]->deaths += 1;
-		if(!empty(trim($p[2])))
+		if(!empty($p[2]))
 			if(array_key_exists($p[2], $playerStat))
 			{
 				killStreak($p[1], $p[2]);
@@ -443,7 +432,7 @@ function writePlayerToFile($player, $playerStat)
 		writePlayerToFile($player, $playerStat);
 	}
 	if(!is_a($playerStat, "PlayerStat")) {
-		c("Not overwriting save data with empty for $player");
+		c("Not saving corrupt savedata for $player");
 		return;
 	}
 	$lines = explode("\n", $contents);
@@ -515,7 +504,7 @@ class Shop
 		'/tel' => ['name'=>"Teleport", 'cost'=>1,       'description'=>"Teleport yourself. Contains 4 per purchase", 'command'=>"/tel"],
 		'/now' => ['name'=>"Dessert Now", 'cost'=>3,   'description'=>"Go straight into the dessert round", 'command'=>"/now"], //Life's short, eat dessert first
 		'/order'=>['name'=>"Special Order", 'cost'=>4, 'description'=>"Choose the next dessert minigame", 'command'=>"/order"],
-		'/buffet'=>['name'=>"Buffet", 'cost'=>9,       'description'=>"A dessert lasting the whole match", 'command'=>"/buffet"]
+		'/buffet'=>['name'=>"Buffet", 'cost'=>9,       'description'=>"Choose a dessert lasting for 10 rounds", 'command'=>"/buffet"]
 	];
 	static $header = " Shop ";
 	static function view($p)
@@ -626,6 +615,10 @@ function printStats($player, $pm = true, $display_name = "", $search = null)
 		c($str1);
 		c($str2);
 	}
+}
+function printLadder($player)
+{
+
 }
 
 class GameManager
@@ -863,7 +856,7 @@ class Collecting extends Minigame
 	{
 		if($time % 30 == 0)
 		{
-			$speed = mt_rand(10,100);
+			$speed = mt_rand(10,60);
 			if(mt_rand(1,2) == 1)
 			{
 				s("SPAWN_ZONE n coin target 250 250 3 0 ".$speed." ".($speed/2)." true 255 255 0 0 1");
@@ -890,22 +883,24 @@ class Collecting extends Minigame
 		}
 		if($time % 5 == 0 && $time != 0)
 		{
-			$speed = mt_rand(-130,130);
+			$speed = mt_rand(-100,100);
 			s("SPAWN_ZONE n coin target ".mt_rand(10,490)." ".mt_rand(10,490)." 3 0 ".$speed." ".$speed." true 255 255 0 0 1");
 		}
 		if($time % 45 == 0 && $time != 0)
 		{
-			$speed = mt_rand(10,150);
+			$speed = mt_rand(10,60);
 			s("SPAWN_ZONE n coin target L 256 316 298 298 316 256 298 214 256 196 214 214 196 256 214 298 256 376 340 340 376 256 340 172 256 136 172 172 136 256 172 340 256 436 383 383 436 256 383 129 256 76 129 129 76 256 129 383 256 496 425 425 496 256 425 87 256 16 87 87 16 256 87 425 500 500 500 0 0 0 0 500 0 500 Z 3 0 $speed $speed true 255 255 0 0 1");
 			s("SPAWN_ZONE n coin target L 298 298 316 256 298 214 256 196 214 214 196 256 214 298 256 376 340 340 376 256 340 172 256 136 172 172 136 256 172 340 256 436 383 383 436 256 383 129 256 76 129 129 76 256 129 383 256 496 425 425 496 256 425 87 256 16 87 87 16 256 87 425 500 500 500 0 0 0 0 500 0 500 Z 3 0 $speed $speed true 255 255 0 0 1");
 			s("SPAWN_ZONE n coin target L 316 256 298 214 256 196 214 214 196 256 214 298 256 376 340 340 376 256 340 172 256 136 172 172 136 256 172 340 256 436 383 383 436 256 383 129 256 76 129 129 76 256 129 383 256 496 425 425 496 256 425 87 256 16 87 87 16 256 87 425 500 500 500 0 0 0 0 500 0 500 Z 3 0 $speed $speed true 255 255 0 0 1");
 			s("SPAWN_ZONE n coin target L 298 214 256 196 214 214 196 256 214 298 256 376 340 340 376 256 340 172 256 136 172 172 136 256 172 340 256 436 383 383 436 256 383 129 256 76 129 129 76 256 129 383 256 496 425 425 496 256 425 87 256 16 87 87 16 256 87 425 500 500 500 0 0 0 0 500 0 500 Z 3 0 $speed $speed true 255 255 0 0 1");
 			s("SPAWN_ZONE n coin target L 256 196 214 214 196 256 214 298 256 376 340 340 376 256 340 172 256 136 172 172 136 256 172 340 256 436 383 383 436 256 383 129 256 76 129 129 76 256 129 383 256 496 425 425 496 256 425 87 256 16 87 87 16 256 87 425 500 500 500 0 0 0 0 500 0 500 Z 3 0 $speed $speed true 255 255 0 0 1");
 		}
-		if($time > 100 && $time % 5 == 0) 
+		if($time >= 100 && $time % 5 == 0) 
 		{
+			if($time == 100)
+				c("Deathzones incomming!");
 			$speed = mt_rand(-100,100);
-			s("SPAWN_ZONE death ".mt_rand(10,490)." ".mt_rand(10,490)." 6 0 ".$speed." ".$speed." true 255 0 0 0 1");
+			s("SPAWN_ZONE death ".mt_rand(10,490)." ".mt_rand(10,490)." 12 0 ".$speed." ".$speed." true 255 0 0 0 1");
 		}
 	}
 	function targetZoneEnter($event)
@@ -959,14 +954,12 @@ class Map extends Minigame
 			s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
 			s("MAP_FILE rxfreaks/hft/".Map::$maps[Map::$play].".aamap.xml");
 			Map::$cur_map = $map_name[0];
-			c("0xbf00bfMap:0xffffff ".Map::$cur_map);
 		}
 		else
 		{
 			s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
 			s("MAP_FILE Wik/dogfight/".Map::$maps[Map::$play].".aamap.xml");
 			Map::$cur_map = $map_name[0];
-			c("0xbf00bfMap0xffffff: ".Map::$cur_map);
 		}
 		if(++Map::$play >= sizeof(Map::$maps))
 			Map::$play = 0;
@@ -989,7 +982,7 @@ class Map extends Minigame
 class Wildfort extends Minigame
 {
 	static $display_name = "Wild Fort";
-	static $description = "Capture the enemy's base on a wacky map"; 
+	static $description = "Capture the enemy bases on a wacky map"; 
 	static $maps = array(
 		"Abductors		| map_file Wik/fortress/Abductors_sty-200614.aamap.xml		| cycle_accel_rim 5 | Rim acceleration. Teleporters might abduct you.",
 		"And180SomeMore	| map_file Wik/fortress/And180SomeMore-050913.aamap.xml		| cycle_accel 0 | cycle_brake_refill 1 | cycle_speed 6 | cycle_speed_decay_above 0 | cycle_start_speed 10 | cycle_turn_speed_factor 1.05 | Turn to gain speed.",
@@ -1082,8 +1075,6 @@ class Wildfort extends Minigame
 			$this->settings[] = trim(strtoupper($l));
 			s($l);
 		}
-		c("0xbf00bfMap: ".$this->name);
-		c($this->hint);
 	}
 	function roundStart()
 	{
@@ -1092,14 +1083,14 @@ class Wildfort extends Minigame
 	}
 	function roundEnd()
 	{
+		while($this->settings)
+			undo(explode(" ",array_pop($this->settings))[0]);
 		$this->__construct();
 	}
 	function __destruct()
 	{
-		foreach($this->settings as $s) {
-			$s = explode(" ",$s)[0];
-			undo($s);
-		}
+		foreach($this->settings as $s)
+			undo(explode(" ",$s)[0]);
 		unload("fort.cfg");
 		unload("teams.cfg");
 		s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
@@ -1528,13 +1519,17 @@ class Reflex extends Minigame
 	public $settings = [];
 	private $winners = [];
 	private $timer = 300;
+	private $first = 999;
 	static $maps = [
 		"Reflex Tunnel | rxfreaks/race/tunnel-6.aamap.xml | SIZE_FACTOR -7 | SP_SIZE_FACTOR -7",
 		"Spiral | rxfreaks/race/spiral-9.aamap.xml | SIZE_FACTOR -5 | SP_SIZE_FACTOR -5",
 		"3mazes | Light/race/3mazes-1.0.2.aamap.xml| SIZE_FACTOR -3 | SP_SIZE_FACTOR -3",
 		"ZigZag | Light/race/zigzag-1.0.2.aamap.xml| SIZE_FACTOR -4 | SP_SIZE_FACTOR -4",
-		"DoubleBind | rxfreaks/race/doublebind-1.aamap.xml| SIZE_FACTOR -6 | SP_SIZE_FACTOR -6",
-		"Maze | Light/race/dungeon-1.0.1.aamap.xml | SIZE_FACTOR -6 | SP_SIZE_FACTOR -6"
+		"DoubleBind | rxfreaks/race/doublebind-3.aamap.xml| SIZE_FACTOR -6 | SP_SIZE_FACTOR -6",
+		"Maze | Light/race/dungeon-1.0.1.aamap.xml | SIZE_FACTOR -6 | SP_SIZE_FACTOR -6",
+		"Messy | rxfreaks/race/blah-2.4.aamap.xml ",
+		"Intestines |  rxfreaks/race/maze-7.1.aamap.xml | SIZE_FACTOR -7.5 | SP_SIZE_FACTOR -7.5",
+		"Octagone | rxfreaks/race/octa-10.aamap.xml | SIZE_FACTOR -7 | SP_SIZE_FACTOR -7"
 	];
 	function __construct()
 	{
@@ -1553,18 +1548,22 @@ class Reflex extends Minigame
 				s(trim($ar[$i]));
 			}
 		}
-		if(++Reflex::$play >= sizeof(Reflex::$maps))
+		Reflex::$play++;
+		if(Reflex::$play >= sizeof(Reflex::$maps))
 			Reflex::$play = 0;
 	}
 	function roundStart()
 	{
-		c("0xbf00bfMap0xffffff: ".$this->cur_map);
 		unset($this->winners);
 		$this->winners = [];
 		$this->timer = 300;
+		$this->first = 999;
+		c("0xbf00bfMap0xffffff: ".$this->cur_map);
 	}
 	function roundEnd()
 	{
+		while($this->settings)
+			undo(explode(" ",array_pop($this->settings))[0]);
 		$this->__construct();
 	}
 	function timedEvents($time)
@@ -1586,23 +1585,24 @@ class Reflex extends Minigame
 		$time = array_pop($e);
 		if(count($this->winners) == 1)
 		{
-			c($players[$winner].$gry." finished the reflex challenge 1st [".$time."s]! (15 pts)");
+			c($players[$winner].$gry." finished the reflex challenge 1st [0x80ff80".$time."s{$gry}]! (15 pts)");
 			s("ADD_SCORE_PLAYER ".$winner." 15");
 			$this->timer = round($time);
+			$this->first = $time;
 		}
 		else if(count($this->winners) == 2)
 		{
-			c($players[$winner].$gry." finished the reflex challenge 2nd [".$time."s]! (10 pts)");
+			c($players[$winner].$gry." finished the reflex challenge 2nd [0xff8080+".($time-$this->first)."s{$gry}]! (10 pts)");
 			s("ADD_SCORE_PLAYER ".$winner." 10");
 		}
 		else if(count($this->winners) == 3)
 		{
-			c($players[$winner].$gry." finished the reflex challenge 3rd [".$time."s]! (7 pts)");
+			c($players[$winner].$gry." finished the reflex challenge 3rd [0xff8080+".($time-$this->first)."s{$gry}]! (7 pts)");
 			s("ADD_SCORE_PLAYER ".$winner." 7");
 		}
 		else
 		{
-			c($players[$winner].$gry." finished the reflex challenge ".count($this->winners)."th [".$time."s]! (4 pts)");
+			c($players[$winner].$gry." finished the reflex challenge ".count($this->winners)."th [0xff8080+".($time-$this->first)."s{$gry}]! (4 pts)");
 			s("ADD_SCORE_PLAYER ".$winner." 4");
 		}
 		if(count($this->winners) == count($players)) {
@@ -1626,7 +1626,7 @@ function closestMatch($str)
 	$shortest = -1;
 	foreach($players as $i => $p)
 	{
-		$lev = levenshtein(strtolower($str),strtolower(strip0x($p)));
+		$lev = levenshtein(strtolower($str),strtolower(strip0x($p)), 0,1,1);
 		if($lev == 0)
 			return $str;
 		if($lev <= $shortest || $shortest < 0)
@@ -1673,6 +1673,11 @@ function readLadder($p)
 		}
 	}
 	return $scores;
+}
+function readLadderTop($p)
+{
+	global $dir;
+	$lf = file($dir."ladder.txt");
 }
 function strip0x($str)
 {
