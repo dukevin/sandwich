@@ -464,7 +464,8 @@ function readPlayerFromFile($player)
 		if($player == $col[0])
 		{
 			$ret = unserialize($col[1]);
-			if(!is_a($ret, "PlayerStat")) {
+			//can't use is_a() since updating the PlayerStat class will always trigger this
+			if(!property_exists($ret, "time")) { 
 				$ret = new PlayerStat();
 				c("Resetting corrupt savedata for $player");
 			}
