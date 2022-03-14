@@ -333,14 +333,6 @@ while(!feof(STDIN))
 		unset($playerStat[$p[1]]);
 		unset($players[$p[1]]);
 	}
-	if($p[0] == "MATCH_ENDED")
-	{
-		foreach($players as $i=>$_)
-			readAndPrintTopLadder($i, $i);
-		sleep(3);
-		foreach($players as $i=>$_)
-			printStats($i);
-	}
 	if($p[0] == "MATCH_WINNER") //MATCH_WINNER uniquename dukevin@rx MATCH_WINNER bananas hardleft stephen
 	{
 		$winners = array_splice($p, 2);		
@@ -361,6 +353,12 @@ while(!feof(STDIN))
 				$playerStat[$i]->credits += 1;
 			}
 		}
+		sleep(1);
+		foreach($players as $i=>$_)
+			readAndPrintTopLadder($i, $i);
+		sleep(3);
+		foreach($players as $i=>$_)
+			printStats($i);
 	}
 	if(preg_match("/^DEATH_FRAG|DEATH_ZOMBIEZONE|DEATH_SHOT_FRAG|DEATH_DEATHZONE|DEATH_SHOT_SUICIDE|DEATH_RUBBERZONE/", $line))
 	{
