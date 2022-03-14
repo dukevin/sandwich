@@ -1518,7 +1518,7 @@ class Bombs extends Minigame
 class Reflex extends Minigame
 {
 	static $display_name = "Reflex Challenge";
-	static $description = "Test your reflexes by racing to the finish 0x808080(1st = 15 pts, 2nd = 10 pts, 3rd = 7 pts, Finishing = 4 pts)";
+	static $description = "Test your reflexes by racing to the finish 0x808080(1st = 10 pts, 2nd = 8 pts, 3rd = 6 pts, Finishing = 4 pts)";
 	static $play = 0;
 	public $cur_map;
 	public $settings = [];
@@ -1532,7 +1532,7 @@ class Reflex extends Minigame
 		"ZigZag | Light/race/zigzag-1.0.2.aamap.xml| SIZE_FACTOR -4 | SP_SIZE_FACTOR -4",
 		"DoubleBind | rxfreaks/race/doublebind-3.aamap.xml| SIZE_FACTOR -6 | SP_SIZE_FACTOR -6",
 		"Maze | Light/race/dungeon-1.0.1.aamap.xml | SIZE_FACTOR -6 | SP_SIZE_FACTOR -6",
-		"Messy | rxfreaks/race/blah-2.4.aamap.xml ",
+		"Grind | rxfreaks/race/blah-2.4.aamap.xml | CYCLE_RUBBER 10 ",
 		"Intestines |  rxfreaks/race/maze-7.1.aamap.xml | SIZE_FACTOR -7.5 | SP_SIZE_FACTOR -7.5",
 		"Octagone | rxfreaks/race/octa-10.aamap.xml | SIZE_FACTOR -7 | SP_SIZE_FACTOR -7"
 	];
@@ -1590,20 +1590,20 @@ class Reflex extends Minigame
 		$time = array_pop($e);
 		if(count($this->winners) == 1)
 		{
-			c($players[$winner].$gry." finished the reflex challenge 1st [0x80ff80".$time."s{$gry}]! (15 pts)");
-			s("ADD_SCORE_PLAYER ".$winner." 15");
+			c($players[$winner].$gry." finished the reflex challenge 1st [0x80ff80".$time."s{$gry}]! (10 pts)");
+			s("ADD_SCORE_PLAYER ".$winner." 10");
 			$this->timer = round($time);
 			$this->first = $time;
 		}
 		else if(count($this->winners) == 2)
 		{
-			c($players[$winner].$gry." finished the reflex challenge 2nd [0xff8080+".($time-$this->first)."s{$gry}]! (10 pts)");
-			s("ADD_SCORE_PLAYER ".$winner." 10");
+			c($players[$winner].$gry." finished the reflex challenge 2nd [0xff8080+".($time-$this->first)."s{$gry}]! (8 pts)");
+			s("ADD_SCORE_PLAYER ".$winner." 8");
 		}
 		else if(count($this->winners) == 3)
 		{
-			c($players[$winner].$gry." finished the reflex challenge 3rd [0xff8080+".($time-$this->first)."s{$gry}]! (7 pts)");
-			s("ADD_SCORE_PLAYER ".$winner." 7");
+			c($players[$winner].$gry." finished the reflex challenge 3rd [0xff8080+".($time-$this->first)."s{$gry}]! (6 pts)");
+			s("ADD_SCORE_PLAYER ".$winner." 6");
 		}
 		else
 		{
