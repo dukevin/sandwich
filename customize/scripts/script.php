@@ -9,12 +9,12 @@ $pink = "0xffa0e0";
 $gry = "0xaadeff";
 /*** End editable settings ***/
 $game = GameManager::getInstance();
-$roundsPlayed = 0;
+$roundsPlayed = $game_time = 0;
 $go_str = "";
 $players = array();
 $playerStat = array();
 $turbos = array();
-$game_time = 0;
+$bounty = null;
 $time_last = strtotime("00:00:00");
 while(!feof(STDIN))
 {
@@ -26,11 +26,7 @@ while(!feof(STDIN))
 		if($p[1] == "/stats" || $p[1] == "/stat" || $p[1] == "/s")
 		{
 			if(isset($p[5])) {
-				$full_str = "";
-				for($i=5; $i < count($p); $i++)
-					$full_str .= $p[$i];
-				$fill_str = trim($fill_str);
-				$search = closestMatch($full_str);
+				$search = closestMatch(implode(" ",array_splice($p, 5)) ,$p[2]);
 				printStats($p[2], true, $players[$search], $search);
 			}
 			else {
@@ -38,9 +34,19 @@ while(!feof(STDIN))
 				printStats($p[2]);
 			}
 		}
+		else if($p[1] == "/ladder")
+		{
+			if(isset($p[5]))
+				$search = closestMatch(implode(" ",array_splice($p, 5)) ,$p[2]);
+			else {
+				$search = $p[2];
+				pm($p[2], "0xRESETTHint: You can also search other players with /ladder <name>");
+			}
+			readAndPrintTopLadder($p[2], $search);
+		}
 		else if($p[1] == "/shop")
 			Shop::view($p[2]);
-		else if($p[1] == "/res" || $p[1] == "/r" || $p[1] == "/respawn" || $p[1] == "/rse" || $p[1] == "//res")
+		else if($p[1] == "/res" || $p[1] == "/r" || $p[1] == "/respawn" || $p[1] == "/rse" || $p[1] == "//res" || $p[1] == "/re")
 		{
 			$p[1] = "/res";
 			if(Shop::buy($p[2],$p[1])) 
@@ -183,7 +189,7 @@ while(!feof(STDIN))
 			$game->playlist($p[2]);
 		}
 		else {
-			pm($p[2], "Invalid command ".$p[1].", try: 0xffffff/stats /shop /res /now /order /buffet /speed /tel /a");
+			pm($p[2], "Invalid command ".$p[1].", try: 0xffffff/stats /ladder /shop /res /now /order /buffet /speed /tel /a");
 			if(is_admin($p, false))
 				pm($p[2], "0x808080Admin commands: /playlist /play /end /reshuffle /debug");
 		}
@@ -296,10 +302,11 @@ while(!feof(STDIN))
 	}
 	if($p[0] == "PLAYER_LOGIN") //PLAYER_LOGIN dog_water dukevin@rx
 	{
-		$players[$p[2]] = "";
 		$playerStat[$p[2]] = readPlayerFromFile($p[2]);
+		if(strlen($players[$p[2]]) == 0)
+			$players[$p[2]] = $p[1];
 		printStats($p[2], false, $players[$p[1]]);
-		unset($players[$p[1]]);
+		unset($players[$p[1]]); 
 		unset($playerStat[$p[1]]);
 	}
 	if($p[0] == "PLAYER_AI_ENTERED")
@@ -329,8 +336,10 @@ while(!feof(STDIN))
 	if($p[0] == "MATCH_ENDED")
 	{
 		foreach($players as $i=>$_)
+			readAndPrintTopLadder($i, $i);
+		sleep(3);
+		foreach($players as $i=>$_)
 			printStats($i);
-		//show ladder scores
 	}
 	if($p[0] == "MATCH_WINNER") //MATCH_WINNER uniquename dukevin@rx MATCH_WINNER bananas hardleft stephen
 	{
@@ -476,7 +485,8 @@ function readPlayerFromFile($player)
 }
 class PlayerStat
 {
-	public function __construct() {
+	public function __construct() 
+	{
 		$this->credits = 0;
 		$this->kills = 0;
 		$this->deaths = 0;
@@ -495,6 +505,7 @@ class PlayerStat
 	public $matchesWon;
 	public $time;
 	public $teles;
+	public function __destruct() {} //one day, writePlayerToFile will be in the destructor so crashes still write
 }
 class Shop
 {
@@ -615,10 +626,6 @@ function printStats($player, $pm = true, $display_name = "", $search = null)
 		c($str1);
 		c($str2);
 	}
-}
-function printLadder($player)
-{
-
 }
 
 class GameManager
@@ -1105,8 +1112,8 @@ class Fort extends Minigame
 	{
 		s("INCLUDE fort.cfg");
 		s("INCLUDE teams.cfg");
-		s("SIZE_FACTOR -1");
-		s("SP_SIZE_FACTOR -1");
+		s("SIZE_FACTOR -2");
+		s("SP_SIZE_FACTOR -2");
 		s("BASE_RESPAWN 1");
 		s("FORTRESS_CONQUERED_SCORE 30");
 		s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
@@ -1389,7 +1396,7 @@ class Pets extends Minigame
 	}
 	function roundEnd()
 	{
-		c("HINT: Typing /a will reset your pet");
+		c("Hint: Typing /a will reset your pet");
 	}
 	function timedEvents($time)
 	{
@@ -1573,7 +1580,7 @@ class Reflex extends Minigame
 		$this->timer--;
 		s("CENTER_MESSAGE ".$this->timer.'s'.str_repeat(" ", 20));
 		if($this->timer <= 0)
-			s("DECLARE_ROUND_WINNER ".$this->winners[0]);
+			s("KILL_ALL");
 	}
 	function targetZoneEnter($e)     //TARGETZONE_PLAYER_ENTER 1  31 650 dukevin@rx 42.4338 622.168 0 1 23.8931
 	{								 //WINZONE_PLAYER_ENTER    1  464 40 dukevin@rx 460.553 38.2499 0 1 53.0025
@@ -1620,23 +1627,6 @@ class Reflex extends Minigame
 	}
 }
 
-function closestMatch($str)
-{
-	global $players;
-	$shortest = -1;
-	foreach($players as $i => $p)
-	{
-		$lev = levenshtein(strtolower($str),strtolower(strip0x($p)), 0,1,1);
-		if($lev == 0)
-			return $str;
-		if($lev <= $shortest || $shortest < 0)
-		{
-			$closest = $i;
-			$shortest = $lev;
-		}
-	}
-	return $closest;
-}
 function readLadder($p)
 {
 	global $dir;
@@ -1674,13 +1664,134 @@ function readLadder($p)
 	}
 	return $scores;
 }
-function readAndPrintTopLadder($p, $s) //$p = player requesting, $s = search
+function readAndPrintTopLadder($p, $s) //$p = player requesting, $s = player being searched
 {
 	global $dir;
-	$width = 84;
-	$lf = file($dir."ladder.txt");
-	$color = "0xffff00";
-	//WIP
+	$full_width = 84;
+	$col_width = 24;
+	$wht = "0xffffff";
+	$gry = "0xa0a0a0";
+	$hlt = "0xff0000";
+	
+	$header1_C = " Ladder ";
+	$header1_L = str_repeat("-", (($col_width-strlen($header1_C))/2)-1 );
+	$header1_R = str_repeat("-", strlen($header1_L) );
+	$header2_C = " Won Rounds ";
+	$header2_L = str_repeat("-", ($col_width-strlen($header2_C)-1)/2 );
+	$header2_R = str_repeat("-", strlen($header2_L) );
+	$header3_C = " Won Matches ";
+	$header3_L = str_repeat("-", ($col_width-strlen($header3_C)-1)/2 );
+	$header3_R = str_repeat("-", strlen($header3_L) );
+	$header_full = $wht.$header1_L.$header1_C.$header1_R." | ".$header2_L.$header2_C.$header2_R." | ".$header3_L.$header3_C.$header3_R;
+	pm($p, $header_full);
+	
+	$obj = gatherData($s, ["ladder.txt", "won_rounds.txt", "won_matches.txt"]);
+	for($j=0,$i=0;$j<count($obj[0]);$j+=3)
+	{
+	  pm($p,$obj[$i][$j]."| ".$obj[$i][$j+1].":".$obj[$i][$j+2]."|".$obj[$i+1][$j]."| ".$obj[$i+1][$j+1].":".$obj[$i+1][$j+2]."|".$obj[$i+2][$j]."| ".$obj[$i+2][$j+1].":".$obj[$i+2][$j+2]);
+	  usleep(20000);
+	}
+}
+function gatherData($s, $files)
+{
+	global $dir;
+	$data = [];
+	foreach($files as $f => $file)
+	{
+		$lf = file($dir.$file);
+		$found = false;
+		foreach($lf as $i=>$l)
+		{
+			$row = explode(" ",$l);
+			$name = trim(end($row));
+			if($name == $s) {
+				$found = $i+1;
+				break;
+			}
+		}
+		foreach($lf as $i=>$l)
+		{
+			$row = explode(" ",$l);
+			$name = trim(end($row));
+			if($i+1==1||$i+1==2||$i+1==3||$name==$s||$i+1==count($lf)||$found&&$i==$found-2||($found<=3||!$found)&&$i+1==4||($found<=3||!$found)&&$i+1==5||$found==4&&$i+1==5)
+			{
+				$data[$f][] = $f == 0 ? padPlace($i+1, true, $name==$s) : padPlace($i+1, false, $name==$s);
+				$data[$f][] = $i+1==count($lf)&&$name!=$s ? padName("...", false) : padName($name, $name==$s);
+				$data[$f][] = padScore(round($row[0]), $name==$s); 
+			}
+		}
+	}
+	return $data;
+}
+function padPlace($num, $first = false, $is_user = false)
+{
+	global $pink;
+	$count = strlen($num);
+	$color = "0xffffff";
+	$gry = "0xa0a0a0";
+	switch($num) 
+	{
+		case 1: $color="0xffd700"; break;
+		case 2: $color="0xbec2cb"; break;
+		case 3: $color="0xb08d57"; break;
+		default: {
+			if($is_user)
+				$color=$pink;
+			else
+				$color="0xffffff";
+		}
+	}
+	if($is_user) 
+		$num .= $pink;
+	else $num .= "0xffffff";
+	if($count == 1)
+		return $first ? $color.$num." " : " ".$color.$num." ";
+	if($count == 2)
+		return $first ? $color.$num : " ".$color.$num;
+	if($count == 3)
+		return $first ? $color."9+".$gry : $color.$num;
+	return $color."99+".$gry;
+}
+function padScore($num, $is_user = false)
+{
+	global $pink;
+	$color = "0xa0a0a0";
+	$wht = "0xffffff";
+	if($is_user)
+		$color = $pink;
+	if(strlen($num) == 1)
+		return " ".$num."  ".$wht;
+	if(strlen($num) == 2)
+		return " ".$num." ".$wht;
+	if(strlen($num) == 3)
+		return " ".$num.$wht;
+	return $color.$num.$wht;
+}
+function padName($name, $is_user = false)
+{
+	global $pink;
+	$color = "0xa0a0a0";
+	if($is_user) 
+		$color = $pink;
+	return $color.substr($name.str_repeat(" ",13),0,14);
+}
+
+function closestMatch($str, $pm = false)
+{
+	global $players;
+	$shortest = -1;
+	foreach($players as $i => $p)
+	{
+		$lev = levenshtein(strtolower($str),strtolower(strip0x($p)), 0,1,1);
+		if($lev <= $shortest || $shortest < 0)
+		{
+			$closest = $i;
+			$shortest = $lev;
+		}
+	}
+	if($pm)
+		pm($pm, "searching for '$closest'..."); //remove later for privacy
+	return $closest;
 }
 function strip0x($str)
 {
