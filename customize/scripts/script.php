@@ -305,6 +305,8 @@ while(!feof(STDIN))
 		$playerStat[$p[2]] = readPlayerFromFile($p[2]);
 		if(strlen($players[$p[2]]) == 0)
 			$players[$p[2]] = $p[1];
+		if(strlen($players[$p[1]]) == 0)
+			$players[$p[1]] = $p[1];
 		printStats($p[2], false, $players[$p[1]]);
 		unset($players[$p[1]]); 
 		unset($playerStat[$p[1]]);
@@ -1110,8 +1112,8 @@ class Fort extends Minigame
 	{
 		s("INCLUDE fort.cfg");
 		s("INCLUDE teams.cfg");
-		s("SIZE_FACTOR -2");
-		s("SP_SIZE_FACTOR -2");
+		s("SIZE_FACTOR 0");
+		s("SP_SIZE_FACTOR 0");
 		s("BASE_RESPAWN 1");
 		s("FORTRESS_CONQUERED_SCORE 30");
 		s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");

@@ -1,3 +1,4 @@
+ct_drg 17.7978 1 1.64725e+09
 nelg@armanelgtron.tk/Nelg 18.0779 5 1.64725e+09
+snip 18.5503 3 1.64725e+09
 dukevin@rx 18.9409 6 1.64725e+09
-snip 20.4241 1 1.64725e+09

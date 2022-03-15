@@ -1,2 +1,3 @@
-nelg@armanelgtron.tk/Nelg 26.2345 2 1.64725e+09
+ct_drg 24.95 1 1.64725e+09
+nelg@armanelgtron.tk/Nelg 26.2345 3 1.64725e+09
 dukevin@rx 26.4114 4 1.64724e+09
