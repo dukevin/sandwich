@@ -73,8 +73,10 @@ while(!feof(STDIN))
 				$roundsPlayed = 9;
 			}
 		}
-		else if($p[1] == "/order") {
-			if(empty($p[5]) || !in_array($p[5], GameManager::$games_list)) {
+		else if($p[1] == "/order") 
+		{
+			if(empty($p[5]) || !in_array($p[5], GameManager::$games_list)) 
+			{
 				if(!empty($p[5]))
 					pm($p[2], "0xff8080Error: Invalid minigame name.");
 				pm($p[2], "List of available minigames:");
@@ -87,8 +89,10 @@ while(!feof(STDIN))
 				$next_game = [$p[2], $p[5]];
 			}
 		}
-		else if($p[1] == "/buffet") {
-			if(empty($p[5]) || !in_array($p[5], GameManager::$games_list)) {
+		else if($p[1] == "/buffet") 
+		{
+			if(empty($p[5]) || !in_array($p[5], GameManager::$games_list)) 
+			{
 				if(!empty($p[5]))
 					pm($p[2], "0xff8080Error: Invalid minigame name.");
 				pm($p[2], "List of available minigames:");
@@ -96,9 +100,13 @@ while(!feof(STDIN))
 				pm($p[2], "Usage: /buffet <minigame>   0xRESETT(Press PAGE UP on your keyboard to scroll up)");
 				continue;
 			}
-			if(Shop::buy($p[2], $p[1])) {
+			if(Shop::buy($p[2], $p[1])) 
+			{
+				if($p[5] == "ctf")
+					$roundsPlayed = 5;
+				else
+					$roundsPlayed = 1;
 				c($players[$p[2]]." {$gry}orders all-you-can-eat {$pink}".$p[5]::$display_name."{$gry} for 10 rounds!");
-				$roundsPlayed = 1;
 				$game->pickGame($p[2], $p[5]);
 			}
 		}
@@ -188,7 +196,8 @@ while(!feof(STDIN))
 				continue;
 			$game->playlist($p[2]);
 		}
-		else {
+		else 
+		{
 			pm($p[2], "Invalid command ".$p[1].", try: 0xffffff/stats /ladder /shop /res /now /order /buffet /speed /tel /a");
 			if(is_admin($p, false))
 				pm($p[2], "0x808080Admin commands: /playlist /play /end /reshuffle /debug");
@@ -355,7 +364,7 @@ while(!feof(STDIN))
 				$playerStat[$i]->credits += 1;
 			}
 		}
-		sleep(1);
+		sleep(2);
 		foreach($players as $i=>$_)
 			readAndPrintTopLadder($i, $i);
 		sleep(3);
@@ -561,7 +570,7 @@ class Bounty
 	{
 		global $players;
 		if($num <= 3)
-			$bounty = 1;
+			$bounty = array_rand([1, 2]);
 		else if($num == 4)
 			$bounty = array_rand([2, 2, 3]);
 		else if($num == 5)
@@ -1228,6 +1237,7 @@ class Bots extends Minigame
 		s("NUM_AIS_PER_ROUND ".$num_ais);
 		s("SCORE_KILL 0");
 		s("SCORE_WIN 5");
+		s("SHOT_PENETRATE_WALLS 1");
 	}
 	function timedEvents($time)
 	{
@@ -1525,7 +1535,6 @@ class Reflex extends Minigame
 	public $cur_map;
 	public $settings = [];
 	private $winners = [];
-	private $timer = 300;
 	private $first = 999;
 	static $maps = [
 		"Reflex Tunnel | rxfreaks/race/tunnel-6.aamap.xml | SIZE_FACTOR -7 | SP_SIZE_FACTOR -7",
@@ -1536,7 +1545,8 @@ class Reflex extends Minigame
 		"Maze | Light/race/dungeon-1.0.1.aamap.xml | SIZE_FACTOR -6 | SP_SIZE_FACTOR -6",
 		"Grind | rxfreaks/race/blah-2.4.aamap.xml | CYCLE_RUBBER 10 ",
 		"Intestines |  rxfreaks/race/maze-7.1.aamap.xml | SIZE_FACTOR -7.5 | SP_SIZE_FACTOR -7.5",
-		"Octagone | rxfreaks/race/octa-10.aamap.xml | SIZE_FACTOR -7 | SP_SIZE_FACTOR -7"
+		"Octagone | rxfreaks/race/octa-10.aamap.xml | SIZE_FACTOR -7 | SP_SIZE_FACTOR -7",
+		"Microhell | pdbq/race/microhell-1.0.3.aamap.xml | SIZE_FACTOR -5 | SP_SIZE_FACTOR -5 "
 	];
 	function __construct()
 	{
@@ -1563,7 +1573,6 @@ class Reflex extends Minigame
 	{
 		unset($this->winners);
 		$this->winners = [];
-		$this->timer = 300;
 		$this->first = 999;
 		c("0xbf00bfMap0xffffff: ".$this->cur_map);
 	}
@@ -1572,15 +1581,6 @@ class Reflex extends Minigame
 		while($this->settings)
 			undo(explode(" ",array_pop($this->settings))[0]);
 		$this->__construct();
-	}
-	function timedEvents($time)
-	{
-		if(count($this->winners) <= 0 || $this->timer == 0)
-			return;
-		$this->timer--;
-		s("CENTER_MESSAGE ".$this->timer.'s'.str_repeat(" ", 20));
-		if($this->timer <= 0)
-			s("KILL_ALL");
 	}
 	function targetZoneEnter($e)     //TARGETZONE_PLAYER_ENTER 1  31 650 dukevin@rx 42.4338 622.168 0 1 23.8931
 	{								 //WINZONE_PLAYER_ENTER    1  464 40 dukevin@rx 460.553 38.2499 0 1 53.0025
@@ -1594,8 +1594,8 @@ class Reflex extends Minigame
 		{
 			c($players[$winner].$gry." finished the reflex challenge 1st [0x80ff80".$time."s{$gry}]! (10 pts)");
 			s("ADD_SCORE_PLAYER ".$winner." 10");
-			$this->timer = round($time);
 			$this->first = $time;
+			s("RACE_END_DELAY ".round($time/2));
 		}
 		else if(count($this->winners) == 2)
 		{
@@ -1612,10 +1612,8 @@ class Reflex extends Minigame
 			c($players[$winner].$gry." finished the reflex challenge ".count($this->winners)."th [0xff8080+".($time-$this->first)."s{$gry}]! (4 pts)");
 			s("ADD_SCORE_PLAYER ".$winner." 4");
 		}
-		if(count($this->winners) == count($players)) {
+		if(count($this->winners) == count($players))
 			s("DECLARE_ROUND_WINNER ".$this->winners[0]);
-			$this->timer = 0;
-		}
 	}
 	function __destruct()
 	{
@@ -1713,7 +1711,7 @@ function gatherData($s, $files)
 		{
 			$row = explode(" ",$l);
 			$name = trim(end($row));
-			if($i+1==1||$i+1==2||$i+1==3||$name==$s||$i+1==count($lf)||$found&&$i==$found-2||($found<=3||!$found)&&$i+1==4||($found<=3||!$found)&&$i+1==5||$found==4&&$i+1==5)
+			if($i+1==1||$i+1==2||$i+1==3||$name==$s||$i+1==count($lf)||$found&&$i==$found-2||($found<=3||!$found)&&$i+1==4||($found<=3||!$found)&&$i+1==5||$found==4&&$i+1==5||$i+1==4&&$found==count($lf))
 			{
 				$data[$f][] = $f == 0 ? padPlace($i+1, true, $name==$s) : padPlace($i+1, false, $name==$s);
 				$data[$f][] = $i+1==count($lf)&&$name!=$s ? padName("...", false) : padName($name, $name==$s);
