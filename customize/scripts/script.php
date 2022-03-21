@@ -2,12 +2,24 @@
 <?php
 /* Requires to be started with SPAWN_SCRIPT so getenv works. +ap required*/
 /* Bugs: Some fort mode zones don't spawn like tele zones, spectators stay in $players arr*/
-/* To add: disco fog mode, ball team killing, racing*/
+/* New features to add: disco fog mode, ball team killing, racing*/
+
 $dir = "/home/duke/aa/servers/sandwich/var/";
-$dessertRounds = 10;	//serve dessert (play a minigame) after this many rounds
+$dessertRounds = 10;				//serve dessert (play a minigame) after this many rounds
+
+$enabled_dessert = true;			//enable dessert mode (minigames which play periodically)			
+$enabled_shop = true;				//enable the use of the shop and earning of credits
+$enabled_shop_non_respawns = true; //enable buying shop items besides respawns such as /speed
+$enabled_killstreaks = true;		//enable killstreaks
+$enabled_bounty = true;				//enable bounties every 5 rounds
+$enabled_round_message = true;		//enable the round_console_message from script
+//disabling everything still allows uers to track their stats and see the ladder highscores
+
 $pink = "0xffa0e0";
 $gry = "0xaadeff";
 /*** End editable settings ***/
+
+/** Todo: Writing to file should be in PlayerStat destructor **/
 $game = GameManager::getInstance();
 $roundsPlayed = $game_time = 0;
 $go_str = "";
@@ -44,10 +56,13 @@ while(!feof(STDIN))
 			}
 			readAndPrintTopLadder($p[2], $search);
 		}
-		else if($p[1] == "/shop")
+		else if($p[1] == "/shop") {
+			if(feature_disabled($p[2], $enabled_shop)) continue;
 			Shop::view($p[2]);
-		else if($p[1] == "/res" || $p[1] == "/r" || $p[1] == "/respawn" || $p[1] == "/rse" || $p[1] == "//res" || $p[1] == "/re")
+		}
+		else if($p[1] == "/res" || $p[1] == "/r" || $p[1] == "/respawn" || $p[1] == "/rse" || $p[1] == "//res" || $p[1] == "/re" || $p[1] == "/rs")
 		{
+			if(feature_disabled($p[2], $enabled_shop)) continue;
 			$p[1] = "/res";
 			if(Shop::buy($p[2],$p[1])) 
 			{
@@ -64,17 +79,19 @@ while(!feof(STDIN))
 		}
 		else if($p[1] == "/now") 
 		{
+			if(feature_disabled($p[2], $enabled_dessert)) continue;
 			if( ($dessertRounds-($roundsPlayed%$dessertRounds)) == 1 ) {
 				pm($p[2], "Next round is already dessert, be patient!");
 				continue;
 			}
 			if(Shop::buy($p[2], $p[1])) {
 				c($players[$p[2]]." {$gry}buys early dessert! (Next round is dessert)");
-				$roundsPlayed = 9;
+				$roundsPlayed = $dessertRounds-1;
 			}
 		}
 		else if($p[1] == "/order") 
 		{
+			if(feature_disabled($p[2], $enabled_dessert)) continue;
 			if(empty($p[5]) || !in_array($p[5], GameManager::$games_list)) 
 			{
 				if(!empty($p[5]))
@@ -89,8 +106,9 @@ while(!feof(STDIN))
 				$next_game = [$p[2], $p[5]];
 			}
 		}
-		else if($p[1] == "/buffet") 
+		else if(($p[1] == "/buffet")) 
 		{
+			if(feature_disabled($p[2], $enabled_dessert)) continue;
 			if(empty($p[5]) || !in_array($p[5], GameManager::$games_list)) 
 			{
 				if(!empty($p[5]))
@@ -106,12 +124,13 @@ while(!feof(STDIN))
 					$roundsPlayed = 5;
 				else
 					$roundsPlayed = 1;
-				c($players[$p[2]]." {$gry}orders all-you-can-eat {$pink}".$p[5]::$display_name."{$gry} for 10 rounds!");
+				c($players[$p[2]]." {$gry}orders all-you-can-eat {$pink}".$p[5]::$display_name."{$gry} for ".$dessertRounds." rounds!");
 				$game->pickGame($p[2], $p[5]);
 			}
 		}
 		else if($p[1] == "/speed")
 		{
+			if(feature_disabled($p[2], ($enabled_shop_non_respawns && $enabled_shop))) continue;
 			if(Shop::buy($p[2], $p[1])) {
 				if($turbos[$p[2]] < 1)
 					$turbos[$p[2]] += 1;
@@ -123,6 +142,7 @@ while(!feof(STDIN))
 		else if($p[1] == "/tel" || $p[1] == "/t" || $p[1] == "/tele" || $p[1] == "/teleport")
 		{
 			$p[1] = "/tel"; 
+			if(feature_disabled($p[2], ($enabled_shop_non_respawns && $enabled_shop))) continue;
 			$name = $p[2];
 			if($playerStat[$name]->teles <= 0)
 			{
@@ -143,10 +163,12 @@ while(!feof(STDIN))
 		}
 		else if($p[1] == "/a" || $p[1] == "/c")
 		{
+			if(feature_disabled($p[2], $enabled_dessert)) continue;
 			$game->cur_game->playercmd($p[2]);
 		}
 		else if($p[1] == "/play" || $p[1] == "/mode")
 		{
+			if(feature_disabled($p[2], $enabled_dessert)) continue;
 			if(!is_admin($p))
 				continue;
 			if($game->pickGame($p[2], $p[5], true))
@@ -154,12 +176,14 @@ while(!feof(STDIN))
 		}
 		else if($p[1] == "/end")
 		{
+			if(feature_disabled($p[2], $enabled_dessert)) continue;
 			if(!is_admin($p))
 				continue;
 			$game->endGame($p[2]);
 		}
 		else if($p[1] == "/reshuffle")
 		{
+			if(feature_disabled($p[2], $enabled_dessert)) continue;
 			if(!is_admin($p))
 				continue;
 			pm($p[2], "Minigames have been reshuffled. Next game is: ".$game->reshuffle());
@@ -192,15 +216,64 @@ while(!feof(STDIN))
 		}
 		else if($p[1] == "/playlist" || $p[1] == "/minigames")
 		{
+			if(feature_disabled($p[2], $enabled_dessert)) continue;
 			if(!is_admin($p))
 				continue;
 			$game->playlist($p[2]);
 		}
+		else if($p[1] == "/rounds_served") 
+		{
+			if(!is_admin($p))
+				continue;
+			if(empty($p[5]) || !is_numeric($p[5])) {
+				pm($p[2], "Dessert is served every ".$dessertRounds." rounds.");
+				pm($p[2], "Usage: /rounds_served <amount>");
+				continue;
+			}
+			$p[5] = round(abs($p[5]));
+			$dessertRounds = $p[5];
+			c("Dessert is now served every ".$dessertRounds." rounds.");
+		}
+		else if($p[1] == "/features") 
+		{
+			if(!is_admin($p))
+				continue;
+			$settings = ["enabled_dessert","enabled_shop","enabled_shop_non_respawns","enabled_killstreaks","enabled_bounty"];
+			$enabled = "0x80ff80YES";
+			$disabled = "0xff8080NO";
+			if(empty($p[5]))
+			{
+				pm($p[2], "Current features:");
+				foreach($settings as $i=>$s)
+					pm($p[2], ($i+1).") ".$s." ".($$s ? $enabled : $disabled));
+				c("Usage: /features <line #>");
+				continue;
+			}
+			$p[5] -= 1;
+			if(!array_key_exists($p[5], $settings)){
+				pm($p[2], "Formatting error. Usage: Line number of the setting to toggle");
+				continue;
+			}
+			${$settings[$p[5]]} ^= 1;
+			pm($p[2], "Set ".$settings[$p[5]]." to ".(${$settings[$p[5]]} ? $enabled : $disabled));
+		}
 		else 
 		{
-			pm($p[2], "Invalid command ".$p[1].", try: 0xffffff/stats /ladder /shop /res /now /order /buffet /speed /tel /a");
-			if(is_admin($p, false))
-				pm($p[2], "0x808080Admin commands: /playlist /play /end /reshuffle /debug");
+			$cmds = "";
+			if($enabled_shop) {
+				$cmds .= " /shop /res";
+				if($enabled_shop_non_respawns) {
+					$cmds .= " /speed /tel";
+				}
+			}
+			if($enabled_dessert)
+				$cmds .= " /now /order /buffet /a";
+			pm($p[2], "Invalid command ".$p[1].", try: 0xffffff/stats /ladder".$cmds);
+			if(is_admin($p, false)) {
+				if($enabled_dessert)
+					$cmd .= "/playlist /play /end /reshuffle /rounds_served";
+				pm($p[2], "0x808080Admin commands: ".$cmd." /features /debug");
+			}
 		}
 	}
 	if($p[0] == "GAME_TIME")
@@ -210,7 +283,7 @@ while(!feof(STDIN))
 		foreach($turbos as $i=>$t)
 			s("SET_CYCLE_SPEED $i ".($t*50));
 	}
-	if($p[0] == "TARGETZONE_PLAYER_ENTER" || $p[0] == "WINZONE_PLAYER_ENTER") 
+	if(($p[0] == "TARGETZONE_PLAYER_ENTER" || $p[0] == "WINZONE_PLAYER_ENTER") && $enabled_dessert) 
 	{   //TARGETZONE_PLAYER_ENTER 2 zonename 100 100 dukevin 90.8824 103.506 1 0 37.6366
 		$game->cur_game->targetZoneEnter($p);
 	}
@@ -220,7 +293,15 @@ while(!feof(STDIN))
 		if(abs($time_now - $time_last) < 12)
 			continue;
 		$time_last = $time_now;
-		$roundsPlayed++;
+		foreach($playerStat as $i=>&$ps) {
+			$ps->time += $game_time;
+			$ps->roundsPlayed++;
+		}
+		$game->cur_game->roundEnd();
+		$roundsPlayed++;  //increment roundsPlayed counter after game->roundEnd, map rotation scripts need it
+
+		if(!$enabled_dessert)
+			continue;
 		if($roundsPlayed % $dessertRounds == 0)
 		{
 			if(!empty($next_game))
@@ -239,11 +320,6 @@ while(!feof(STDIN))
 		{
 			c($pink.($dessertRounds-($roundsPlayed%$dessertRounds))."0xffffff more rounds until dessert");
 		}
-		foreach($playerStat as $i=>&$ps) {
-			$ps->time += $game_time;
-			$ps->roundsPlayed++;
-		}
-		$game->cur_game->roundEnd();
 	}
 	if($p[0] == "ROUND_COMMENCING") //ROUND_COMMENCING 6 10
 	{
@@ -272,6 +348,7 @@ while(!feof(STDIN))
 				$bounty = new Bounty(count($players));
 				continue;
 			}
+			if(!$enabled_round_message) continue;
 			switch(rand(1,4))
 			{
 				case 1: $blurb = "Open play is encouraged by settings, so try to follow"; break;
@@ -330,6 +407,8 @@ while(!feof(STDIN))
 	}
 	if($p[0] == "PLAYER_LEFT")
 	{
+		if(!array_key_exists($p[1], $playerStat))
+			continue;
 		$playerStat[$p[1]]->time += $game_time;
 		printStats($p[1], false, $players[$p[1]]);
 		if(!is_auth($p[1]) && $playerStat[$p[1]]->time < 600 || !array_key_exists($p[1], $playerStat)) 
@@ -353,14 +432,14 @@ while(!feof(STDIN))
 			if(in_array($i, $winners))
 			{
 				$reason = count($winners) == 1 ? "winning!" : "being on the winning team!";
-				c("0xffffff# ".$players[$i]."0x00ffff earns {$pink}\$5 0x00ffffcredits for ".$reason);
+				if($enabled_shop) c("0xffffff# ".$players[$i]."0x00ffff earns {$pink}\$5 0x00ffffcredits for ".$reason);
 				$playerStat[$i]->credits += 5;
 				$playerStat[$i]->matchesWon++;
 				$playerStat[$i]->roundsWon++;
 			}
 			else
 			{
-				pm($i, "0xRESETTYou earned {$pink}\$1 0xRESETTcredit for participating. Spend credits by typing {$gry}/shop");
+				if($enabled_shop) pm($i, "0xRESETTYou earned {$pink}\$1 0xRESETTcredit for participating. Spend credits by typing {$gry}/shop");
 				$playerStat[$i]->credits += 1;
 			}
 		}
@@ -391,9 +470,9 @@ while(!feof(STDIN))
 
 function killStreak($victim, $killer)
 {
-	global $players, $pink, $gry, $playerStat;
+	global $players, $pink, $gry, $playerStat, $enabled_killstreaks, $enabled_shop;
 	static $killstreak = [];
-	if(count($players) <= 2) //killsreaks not active for 2 players
+	if(count($players) <= 2 || !$enabled_killstreaks) //killsreaks not active for 2 players
 		return;
 	$killstreak[$killer][] = $victim;
 	if(@count($killstreak[$victim]) >= 5)
@@ -403,37 +482,37 @@ function killStreak($victim, $killer)
 	if($numKills == 5)
 	{
 		c($players[$killer]."{$gry} is on a killing spree! (5 kills)");
-		pm($killer, "  Killing spree = {$pink}\$2");
+		if($enabled_shop) pm($killer, "  Killing spree = {$pink}\$2");
 		$playerStat[$killer]->credits += 2;
 	}
 	else if($numKills == 10)
 	{
 		c($players[$killer]."{$gry} is on a killing FRENZY! (10 kills)");
-		pm($killer, "  Killing frenzy = {$pink}\$5");
+		if($enabled_shop) pm($killer, "  Killing frenzy = {$pink}\$5");
 		$playerStat[$killer]->credits += 5;
 	}
 	else if($numKills == 15)
 	{
 		c($players[$killer]."{$gry} is on a RUNNING RIOT! (15 kills)");
-		pm($killer, "  Running Riot = {$pink}\$8");
+		if($enabled_shop) pm($killer, "  Running Riot = {$pink}\$8");
 		$playerStat[$killer]->credits += 8;
 	}
 	else if($numKills == 20)
 	{
 		c($players[$killer]."{$gry} is on a RAMPAGE! (20 kills)");
-		pm($killer, "  Rampage = {$pink}\$13");
+		if($enabled_shop) pm($killer, "  Rampage = {$pink}\$13");
 		$playerStat[$killer]->credits += 13;
 	}
 	else if($numKills == 25)
 	{
 		c($players[$killer]."{$gry} is UNTOUCHABLE! (25 kills)");
-		pm($killer, "  Untouchable = {$pink}\$15");
+		if($enabled_shop) pm($killer, "  Untouchable = {$pink}\$15");
 		$playerStat[$killer]->credits += 15;
 	}
 	else if($numKills >= 30 && $numKills % 5 == 0)
 	{
 		c($players[$killer]."{$gry} is INVINCIBLE! (".$numKills." kills)");
-		pm($killer, "  Invincible = {$pink}\$20");
+		if($enabled_shop) pm($killer, "  Invincible = {$pink}\$20");
 		$playerStat[$killer]->credits += 20;
 	}
 }
@@ -519,28 +598,34 @@ class PlayerStat
 class Shop
 {
 	static $wares = [
-		'/res' => ['name'=>"Respawns", 'cost'=>1,      'description'=>"Respawn any time on command", 'command'=>"/res"],
-		'/speed' => ['name'=>"Speed", 'cost'=>1,       'description'=>"Your speed is doubled for the round", 'command'=>"/speed"],
-		'/tel' => ['name'=>"Teleport", 'cost'=>1,       'description'=>"Teleport yourself. Contains 4 per purchase", 'command'=>"/tel"],
-		'/now' => ['name'=>"Dessert Now", 'cost'=>3,   'description'=>"Go straight into the dessert round", 'command'=>"/now"], //Life's short, eat dessert first
-		'/order'=>['name'=>"Special Order", 'cost'=>4, 'description'=>"Choose the next dessert minigame", 'command'=>"/order"],
-		'/buffet'=>['name'=>"Buffet", 'cost'=>9,       'description'=>"Choose a dessert lasting for 10 rounds", 'command'=>"/buffet"]
+		'/res' => ['name'=>"Respawns", 'cost'=>1, 'description'=>"Respawn any time on command", 'command'=>"/res", 'type'=>"res"],
+		'/speed' => ['name'=>"Speed", 'cost'=>1,  'description'=>"Your speed is doubled for the round", 'command'=>"/speed", 'type'=>"nonres"],
+		'/tel' => ['name'=>"Teleport", 'cost'=>1, 'description'=>"Teleport yourself. Contains 4 per purchase", 'command'=>"/tel", 'type'=>"nonres"],
+		'/now' => ['name'=>"Dessert Now", 'cost'=>3, 'description'=>"Go straight into the dessert round", 'command'=>"/now", 'type'=>"dessert"],
+		'/order'=>['name'=>"Special Order", 'cost'=>4, 'description'=>"Choose the next dessert minigame", 'command'=>"/order", 'type'=>"dessert"],
+		'/buffet'=>['name'=>"Buffet", 'cost'=>9, 'description'=>"Choose a dessert lasting for 10 rounds", 'command'=>"/buffet", 'type'=>"dessert"]
 	];
 	static $header = " Shop ";
 	static function view($p)
 	{
-		global $playerStat;
+		global $playerStat, $enabled_shop_non_respawns, $enabled_dessert;
 		$footer = " You have \$".$playerStat[$p]->credits." ";
 		$len = 56-strlen(Shop::$header);
 		$len2 = 56-strlen($footer);
 		pm($p,"0xffffff".str_repeat("-",$len/2).Shop::$header.str_repeat("-",$len/2));
-		foreach(Shop::$wares as $item)
+		foreach(Shop::$wares as $i =>$item) 
+		{
+			if(!$enabled_shop_non_respawns && $item['type'] == "nonres")
+				continue;
+			if(!$enabled_dessert && $item['type'] == "dessert")
+				continue;
 			pm($p, $item['command']."0x808080".str_repeat(".", 9-strlen($item['command']))."0x50a0ff".$item['name']."0x808080".str_repeat(".", 15-strlen($item['name']))."0xffff00\$".$item['cost']."0x808080".str_repeat(".",5).$item['description']);
+		}
 		pm($p,"0xffffff".str_repeat("-",$len2/2).$footer.str_repeat("-",$len2/2));
 	}
 	static function buy($p, $cmd)
 	{
-		global $playerStat;
+		global $playerStat, $enabled_shop_non_respawns, $enabled_dessert;
 		$ps = $playerStat[$p];
 		if(!array_key_exists($cmd, Shop::$wares))
 			return false;
@@ -551,7 +636,7 @@ class Shop
 		}
 		$game = GameManager::getInstance();
 		$mode = $game->cur_game;
-		if(($cmd == "/speed" || $cmd == "/tel") && (is_a($mode,"htf") || is_a($mode,"ctf") || is_a($mode,"reflex")))
+		if(($cmd == "/speed" || $cmd == "/tel") && (is_a($mode,"htf") || is_a($mode,"ctf") || is_a($mode,"reflex") || is_a($mode,"fort")))
 		{
 			pm($p, "You cannot purchase ".$cmd." during ".$mode::$display_name);
 			return false;
@@ -568,7 +653,9 @@ class Bounty
 	public $target;
 	function __construct($num)
 	{
-		global $players;
+		global $players, $enabled_bounty;
+		if(!$enabled_bounty)
+			return;
 		if($num <= 3)
 			$bounty = array_rand([1, 2]);
 		else if($num == 4)
@@ -585,32 +672,40 @@ class Bounty
 	}
 	function announce()
 	{
-		global $pink, $players, $gry;
+		global $pink, $players, $gry, $enabled_shop;
 		if($this->amount == 0)
 			$this->amount = 1;
 		$plur = $this->amount == 1 ? "" : "s";
-		c("WANTED! There is a bounty on ".$players[$this->target]."{$gry} for {$pink}\$".$this->amount."{$gry} credit{$plur}!");
-		pm($this->target, "Survive this bounty for {$pink}\$".(1)."{$gry} credit");
+		$award = $enabled_shop ? "credit" : "point";
+		$prefx = $enabled_shop ? "\$" : "";
+		c("WANTED! There is a bounty on ".$players[$this->target].$gry." for ".$pink.$prefx.$this->amount.$gry." ".$award.$plur."!");
+		pm($this->target, "Survive this bounty for ".$pink.$prefx.$this->amount.$gry." ".$award.$plur);
 	}
 	function award($killer)
 	{
-		global $players, $playerStat, $pink, $gry;
+		global $players, $playerStat, $pink, $gry, $enabled_shop;
+		$award = $enabled_shop ? "" : "point";
+		$prefx = $enabled_shop ? "\$" : "";
 		$playerStat[$killer]->credits += $this->amount;
-		c($players[$killer]."{$gry} claims the {$pink}\$".$this->amount."{$gry} bounty on ".$players[$this->target]."{$gry}'s head!");
+		c($players[$killer]."{$gry} claims the {$pink}".$prefx.$this->amount."{$gry} ".$award." bounty on ".$players[$this->target]."{$gry}'s head!");
 		$this->target = $this->amount = 0;
+		if(!$enabled_shop) s("ADD_SCORE_PLAYER ".$players[$killer]." ".$this->amount);
 	}
 	function survive()
 	{
-		global $players, $playerStat, $pink, $gry;
-		$playerStat[$this->target]->credits += 1;
-		c($players[$this->target]."{$gry} survives the bounty earning {$pink}\$1{$gry}!");
+		global $players, $playerStat, $pink, $gry, $enabled_shop;
+		$playerStat[$this->target]->credits += $this->amount;
+		if(!$enabled_shop) s("ADD_SCORE_PLAYER ".$players[$this->target]." ".$this->amount);
+		$award = $enabled_shop ? "" : "point";
+		$prefx = $enabled_shop ? "\$" : "";
+		c($players[$this->target]."{$gry} survives the bounty earning ".$pink.$prefx.$this->amount.$gry." ".$award.$plur."!");
 		$this->target = $this->amount = 0;
 	}
 }
 
 function printStats($player, $pm = true, $display_name = "", $search = null)
 {
-	global $playerStat;
+	global $playerStat, $enabled_shop;
 	if(!isset($search))
 		$search = $player;
 	if(!array_key_exists($search, $playerStat)) {
@@ -621,11 +716,9 @@ function printStats($player, $pm = true, $display_name = "", $search = null)
 	$gry = "0xa0a0f0";
 	$scores = readLadder($search);
 	$ps = $playerStat[$search];
-	if($pm && $search == $player)
-		$subject = "Your";
-	else
-		$subject = $display_name."{$gry}'s";
-	$str1 = $gry.$subject." Overall Rank: {$wht}".$scores[0]." of ".$scores[3]."{$gry}, K/D: {$wht}".round($ps->kills/$ps->deaths,2)."{$gry}, Kills: {$wht}".$ps->kills."{$gry}, Credits: {$wht}\$".$ps->credits;
+	$subject = $pm && $search == $player ? "Your" : $display_name."{$gry}'s";
+	$credits_str = $enabled_shop ? ", Credits: {$wht}\$".$ps->credits : "";
+	$str1 = $gry.$subject." Overall Rank: {$wht}".$scores[0]." of ".$scores[3]."{$gry}, K/D: {$wht}".round($ps->kills/$ps->deaths,2)."{$gry}, Kills: {$wht}".$ps->kills."{$gry}".$credits_str;
 	$str2 = $gry."  Time played: {$wht}".round($ps->time/3600,1)." hrs{$gry}, Round wins: {$wht}".$scores[1]." (".round(($ps->roundsWon/$ps->roundsPlayed)*100)."%){$gry}, Match wins: {$wht}".$scores[2]." (".round(($ps->matchesWon/$ps->matchesPlayed)*100)."%)";
 	if($pm) {
 		pm($player, $str1);
@@ -835,8 +928,11 @@ class Axes extends Minigame
 {
 	static $display_name = "Axes";
 	static $description = "The axes have changed";
+	static $initial_round = 0;
 	function __construct()
 	{
+		global $roundsPlayed;
+		Axes::$initial_round = $roundsPlayed;
 		$rand = mt_rand(3,8);
 		if($rand == 4)
 			$rand = 6;
@@ -845,6 +941,9 @@ class Axes extends Minigame
 	}
 	function roundEnd()
 	{
+		global $roundsPlayed;
+		if(Axes::$initial_round == $roundsPlayed)
+			return;
 		$this->__construct(); //pick new axes for buffets
 	}
 	function __destruct()
@@ -960,8 +1059,11 @@ class Map extends Minigame
 	);
 	static $play = 0;
 	static $cur_map = "none";
+	static $initial_round = 0;
 	function __construct()
 	{
+		global $roundsPlayed;
+		Map::$initial_round == $roundsPlayed;
 		if(Map::$play == 0)
 			shuffle(Map::$maps);
 		$map_name = explode("-",Map::$maps[Map::$play]);
@@ -986,6 +1088,9 @@ class Map extends Minigame
 	}
 	function roundEnd()
 	{
+		global $roundsPlayed;
+		if(Map::$initial_round == $roundsPlayed)
+			return;
 		$this->__construct();
 	}
 	function __destruct()
@@ -1068,8 +1173,11 @@ class Wildfort extends Minigame
 	private $hint;
 	private $name;
 	private $settings = [];
+	static $initial_round = 0;
 	function __construct()
 	{
+		global $roundsPlayed;
+		Wildfort::$initial_round = $roundsPlayed;
 		s("INCLUDE teams.cfg");
 		s("INCLUDE fort.cfg");
 		s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
@@ -1099,6 +1207,9 @@ class Wildfort extends Minigame
 	}
 	function roundEnd()
 	{
+		global $roundsPlayed;
+		if(Wildfort::$initial_round == $roundsPlayed)
+			return;
 		while($this->settings)
 			undo(explode(" ",array_pop($this->settings))[0]);
 		$this->__construct();
@@ -1116,15 +1227,16 @@ class Wildfort extends Minigame
 class Fort extends Minigame
 {
 	static $display_name = "Fort";
-	static $description = "Fort with submarine physics and base respawns. 0x808080(30 pts for base capture)";
+	static $description = "Fort with submarine physics and respawn zones. 0x808080(30 pts for base capture)";
 	function __construct()
 	{
 		s("INCLUDE fort.cfg");
 		s("INCLUDE teams.cfg");
 		s("SIZE_FACTOR 0");
 		s("SP_SIZE_FACTOR 0");
-		s("BASE_RESPAWN 1");
-		s("FORTRESS_CONQUERED_SCORE 30");
+		s("CYCLE_RESPAWN_ZONE 1");
+		s("CYCLE_RESPAWN_ZONE_GROWTH -0.001");
+		s("FORTRESS_CONQUERED_SCORE 10");
 		s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
 		s("MAP_FILE rxfreaks/classic/fort-1.2.aamap.xml");
 	}
@@ -1134,7 +1246,7 @@ class Fort extends Minigame
 		unload("teams.cfg");
 		undo("SIZE_FACTOR");
 		undo("SP_SIZE_FACTOR");
-		undo("BASE_RESPAWN");
+		undo("CYCLE_RESPAWN_ZONE");
 		undo("FORTRESS_CONQUERED_SCORE");
 		s("MAP_FILE Anonymous/polygon/regular/square-1.0.1.aamap.xml");
 	}
@@ -1169,8 +1281,6 @@ class Koh extends Minigame
 		if($rand == 2) mt_rand(1,4); //2 is half as likely to appear
 		if($rand == 1)
 		{
-			//if(mt_rand(1,2) == 1)
-			//	s("INCLUDE teams.cfg");
 			s("KOH_SCORE 2");
 			s("SPAWN_ZONE koh 250 250 ".mt_rand(30, 60)." 0 0 0 false");
 		}
@@ -1194,13 +1304,9 @@ class Koh extends Minigame
 				s("SPAWN_ZONE koh 350 150 40 0 0 0 false");
 			if(sizeof($players) >= 4)
 				s("SPAWN_ZONE koh 350 350 40 0 0 0 false");
-			//if(mt_rand(1,4) == 1)
-			//	s("INCLUDE teams.cfg");
 		}
 		if($rand == 4)
 		{
-			//if(mt_rand(1,2) == 1)
-			//	s("INCLUDE teams.cfg");
 			$speed = mt_rand(1,50);
 			s("KOH_SCORE 2");
 			s("SPAWN_ZONE koh L 100 100 100 400 400 400 400 100 Z ".mt_rand(30, 50)." 0 $speed $speed 0 false");
@@ -1247,19 +1353,17 @@ class Bots extends Minigame
 			foreach($ais as $a)
 				s("SET_CYCLE_RUBBER $a 12");
 		}
-		if($time % 30 == 0 && $time != 0)
-			s("AI_IQ 0");
+		if($time >= 30)
+		{
+			if($time % 30 == 0)
+				c("Bot speed decrease!");
+			foreach($ais as $a)
+				s("SET_CYCLE_SPEED $a 0");
+		}
 		if($time % 60 == 0 && $time != 0) {
 			c("Shooting enabled! Hold brakes (v) to fire.");
 			s("INCLUDE shooting.cfg");
 			s("ZOMBIE_ZONE 0");
-		}
-		if($time >= 90) 
-		{
-			if($time % 90 == 0)
-				c("Bot speed decrease!");
-			foreach($ais as $a)
-				s("SET_CYCLE_SPEED $a 0");
 		}
 	}
 	function __destruct()
@@ -1532,6 +1636,7 @@ class Reflex extends Minigame
 	static $display_name = "Reflex Challenge";
 	static $description = "Test your reflexes by racing to the finish 0x808080(1st = 10 pts, 2nd = 8 pts, 3rd = 6 pts, Finishing = 4 pts)";
 	static $play = 0;
+	static $initial_round = 0;
 	public $cur_map;
 	public $settings = [];
 	private $winners = [];
@@ -1550,6 +1655,8 @@ class Reflex extends Minigame
 	];
 	function __construct()
 	{
+		global $roundsPlayed;
+		Reflex::$initial_round = $roundsPlayed;
 		s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
 		s("INCLUDE reflex.cfg");
 		if(Reflex::$play == 0)
@@ -1578,6 +1685,9 @@ class Reflex extends Minigame
 	}
 	function roundEnd()
 	{
+		global $roundsPlayed;
+		if(Reflex::$initial_round == $roundsPlayed)
+			return;
 		while($this->settings)
 			undo(explode(" ",array_pop($this->settings))[0]);
 		$this->__construct();
@@ -1791,6 +1901,13 @@ function closestMatch($str, $pm = false)
 		pm($pm, "searching for '$closest'..."); //remove later for privacy
 	return $closest;
 }
+function feature_disabled($player, $var) //if var is false, it's disabled
+{
+	if($var == true)
+		return false;
+	pm($player, "This feature is disabled. Use /features to re-enable it.");
+	return true;
+}
 function strip0x($str)
 {
 	if($str === false)
@@ -1834,8 +1951,6 @@ function c($string)
 }
 function pm($p, $string)
 {
-	if($p instanceof Player)
-		$p = $p->name;
 	echo "player_message {$p} \"0xaadeff{$string}\"\n ";
 }
 ?>
