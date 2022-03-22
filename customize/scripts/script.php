@@ -2,7 +2,7 @@
 <?php
 /* Requires to be started with SPAWN_SCRIPT so getenv works. +ap required*/
 /* Bugs: Some fort mode zones don't spawn like tele zones, spectators stay in $players arr*/
-/* New features to add: disco fog mode, ball team killing, racing*/
+/* New features to add: disco fog mode, ball team killing, camping, disable overwriting of modes by players if not enough time passed, max dessert time*/
 
 $dir = "/home/duke/aa/servers/sandwich/var/";
 $dessertRounds = 10;				//serve dessert (play a minigame) after this many rounds
@@ -318,7 +318,12 @@ while(!feof(STDIN))
 		}
 		else
 		{
-			c($pink.($dessertRounds-($roundsPlayed%$dessertRounds))."0xffffff more rounds until dessert");
+			if(!is_a($game->cur_game, "None")) {
+				$tmp = $game->cur_game;
+				c("0xRESETT".$tmp::$display_name." plays for ".$pink.($dessertRounds-($roundsPlayed%$dessertRounds))."0xffffff more rounds");
+			}
+			else
+				c($pink.($dessertRounds-($roundsPlayed%$dessertRounds))."0xffffff more rounds until dessert");
 		}
 	}
 	if($p[0] == "ROUND_COMMENCING") //ROUND_COMMENCING 6 10
@@ -631,6 +636,10 @@ class Shop
 			return false;
 		$cost = Shop::$wares[$cmd]['cost'];
 		if($ps->credits < $cost) {
+			if(!isset($ps->credits)) {
+				pm($p, "Your stats are not loaded yet, possibly due to just logging in.");
+				return false;
+			}
 			pm($p, "You don't have enough credits. $cmd costs \$".$cost." you only have $".$ps->credits);
 			return false;
 		}
@@ -1227,7 +1236,7 @@ class Wildfort extends Minigame
 class Fort extends Minigame
 {
 	static $display_name = "Fort";
-	static $description = "Fort with submarine physics and respawn zones. 0x808080(30 pts for base capture)";
+	static $description = "Fort with submarine physics and respawn zones. 0x808080(10 pts for base capture)";
 	function __construct()
 	{
 		s("INCLUDE fort.cfg");
@@ -1649,7 +1658,7 @@ class Reflex extends Minigame
 		"DoubleBind | rxfreaks/race/doublebind-3.aamap.xml| SIZE_FACTOR -6 | SP_SIZE_FACTOR -6",
 		"Maze | Light/race/dungeon-1.0.1.aamap.xml | SIZE_FACTOR -6 | SP_SIZE_FACTOR -6",
 		"Grind | rxfreaks/race/blah-2.4.aamap.xml | CYCLE_RUBBER 10 ",
-		"Intestines |  rxfreaks/race/maze-7.1.aamap.xml | SIZE_FACTOR -7.5 | SP_SIZE_FACTOR -7.5",
+		"Intestines |  rxfreaks/race/maze-7.1.aamap.xml | SIZE_FACTOR -7.5 | SP_SIZE_FACTOR -7.5 | SPAWN_WINGMEN_SIDE 0",
 		"Octagone | rxfreaks/race/octa-10.aamap.xml | SIZE_FACTOR -7 | SP_SIZE_FACTOR -7",
 		"Microhell | pdbq/race/microhell-1.0.3.aamap.xml | SIZE_FACTOR -5 | SP_SIZE_FACTOR -5 "
 	];
@@ -1779,7 +1788,6 @@ function readAndPrintTopLadder($p, $s) //$p = player requesting, $s = player bei
 	$col_width = 24;
 	$wht = "0xffffff";
 	$gry = "0xa0a0a0";
-	$hlt = "0xff0000";
 	
 	$header1_C = " Ladder ";
 	$header1_L = str_repeat("-", (($col_width-strlen($header1_C))/2)-1 );
@@ -1833,7 +1841,7 @@ function gatherData($s, $files)
 }
 function padPlace($num, $first = false, $is_user = false)
 {
-	global $pink;
+	$hlt = "0xaadeff";
 	$count = strlen($num);
 	$color = "0xffffff";
 	$gry = "0xa0a0a0";
@@ -1844,13 +1852,13 @@ function padPlace($num, $first = false, $is_user = false)
 		case 3: $color="0xb08d57"; break;
 		default: {
 			if($is_user)
-				$color=$pink;
+				$color=$hlt;
 			else
 				$color="0xffffff";
 		}
 	}
 	if($is_user) 
-		$num .= $pink;
+		$num .= $hlt;
 	else $num .= "0xffffff";
 	if($count == 1)
 		return $first ? $color.$num." " : " ".$color.$num." ";
@@ -1862,11 +1870,11 @@ function padPlace($num, $first = false, $is_user = false)
 }
 function padScore($num, $is_user = false)
 {
-	global $pink;
+	$hlt = "0xaadeff";
 	$color = "0xa0a0a0";
 	$wht = "0xffffff";
 	if($is_user)
-		$color = $pink;
+		$color = $hlt;
 	if(strlen($num) == 1)
 		return " ".$num."  ".$wht;
 	if(strlen($num) == 2)
@@ -1877,10 +1885,10 @@ function padScore($num, $is_user = false)
 }
 function padName($name, $is_user = false)
 {
-	global $pink;
+	$hlt = "0xaadeff";
 	$color = "0xa0a0a0";
 	if($is_user) 
-		$color = $pink;
+		$color = $hlt;
 	return $color.substr($name.str_repeat(" ",13),0,14);
 }
 
