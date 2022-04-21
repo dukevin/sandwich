@@ -2,14 +2,14 @@
 <?php
 /* Requires to be started with SPAWN_SCRIPT so getenv works. +ap required*/
 /* Bugs: Some fort mode zones don't spawn like tele zones, spectators stay in $players arr*/
-/* New features to add: disco fog mode, ball team killing, camping, disable overwriting of modes by players if not enough time passed, max dessert time*/
+/* New features to add: disco fog mode, ball team killing, camping, disable overwriting of modes by players if not enough time passed, /mix for adding physics to modes*/
 
 $dir = "/home/duke/aa/servers/sandwich/var/";
 $dessertRounds = 10;				//serve dessert (play a minigame) after this many rounds
 
 $enabled_dessert = true;			//enable dessert mode (minigames which play periodically)			
 $enabled_shop = true;				//enable the use of the shop and earning of credits
-$enabled_shop_non_respawns = true; //enable buying shop items besides respawns such as /speed
+$enabled_shop_non_respawns = true;	//enable buying shop items besides respawns such as /speed
 $enabled_killstreaks = true;		//enable killstreaks
 $enabled_bounty = true;				//enable bounties every 5 rounds
 $enabled_round_message = true;		//enable the round_console_message from script
@@ -21,13 +21,15 @@ $gry = "0xaadeff";
 
 /** Todo: Writing to file should be in PlayerStat destructor **/
 $game = GameManager::getInstance();
-$roundsPlayed = $game_time = 0;
+$game_time = 0;
 $go_str = "";
 $players = array();
 $playerStat = array();
 $turbos = array();
 $bounty = null;
 $time_last = strtotime("00:00:00");
+
+c(basename(__FILE__)." started succesfully");
 while(!feof(STDIN))
 {
 	$line = rtrim(fgets(STDIN, 1024));
@@ -80,13 +82,13 @@ while(!feof(STDIN))
 		else if($p[1] == "/now") 
 		{
 			if(feature_disabled($p[2], $enabled_dessert)) continue;
-			if( ($dessertRounds-($roundsPlayed%$dessertRounds)) == 1 ) {
+			if($game->roundsTillDessert == 1) {
 				pm($p[2], "Next round is already dessert, be patient!");
 				continue;
 			}
 			if(Shop::buy($p[2], $p[1])) {
 				c($players[$p[2]]." {$gry}buys early dessert! (Next round is dessert)");
-				$roundsPlayed = $dessertRounds-1;
+				$game->roundsTillDessert = 1;
 			}
 		}
 		else if($p[1] == "/order") 
@@ -101,9 +103,13 @@ while(!feof(STDIN))
 				pm($p[2], "Usage: /order <minigame>   0xRESETT(Press PAGE UP on your keyboard to scroll up)");
 				continue;
 			}
+			if($game->roundsTillDessert == 0) {
+				pm($p[2], "You cannot order at this time, wait until next round.");
+				continue;
+			}
 			if(Shop::buy($p[2], $p[1])) {
-				c($players[$p[2]]." {$gry}orders {$pink}".$p[5]::$display_name."{$gry} for the next dessert! (in ".($dessertRounds-($roundsPlayed%$dessertRounds))." rounds)");
-				$next_game = [$p[2], $p[5]];
+				c($players[$p[2]]." {$gry}orders {$pink}".$p[5]::$display_name."{$gry} for the next dessert! (in ".($game->roundsTillDessert)." rounds)");
+				$game->nextGame = [$p[2], $p[5]];
 			}
 		}
 		else if(($p[1] == "/buffet")) 
@@ -120,11 +126,8 @@ while(!feof(STDIN))
 			}
 			if(Shop::buy($p[2], $p[1])) 
 			{
-				if($p[5] == "ctf")
-					$roundsPlayed = 5;
-				else
-					$roundsPlayed = 1;
-				c($players[$p[2]]." {$gry}orders all-you-can-eat {$pink}".$p[5]::$display_name."{$gry} for ".$dessertRounds." rounds!");
+				$game->roundsTillDessert = $dessertRounds;
+				c($players[$p[2]]." {$gry}orders all-you-can-eat {$pink}".$p[5]::$display_name."{$gry} for ".$game->roundsTillDessert." rounds!");
 				$game->pickGame($p[2], $p[5]);
 			}
 		}
@@ -150,16 +153,29 @@ while(!feof(STDIN))
 					continue;
 				$playerStat[$name]->teles = 4;
 				pm($name, "You had no teleports left so you bought ".$playerStat[$name]->teles." more.");
-				pm($name,"0xRESETTHint: You can also jump to a random location by typing: {$pink}/tel r");
+				pm($name,"0xRESETTHint: Random tele: {$pink}/tel r0xRESETT, Coords: {$pink}/tel <x> <y>");
 			}
-			if($p[5] == "r")
-				$cmd = mt_rand(10,490)." ".mt_rand(10,490)." abs";
-			else
-				$cmd = "30";
 			$playerStat[$name]->teles--;
 			pm($name, "0xRESETT".$playerStat[$name]->teles." teles remaining.");
+
+			if($p[5] == "r") {
+				$cmd = mt_rand(10,490)." ".mt_rand(10,490)." abs";
+				c($players[$name]." {$gry}teleports to a random location!");
+			}
+			else if(is_numeric($p[5]) && is_numeric($p[6]))
+			{
+				$p[5] = $p[5] > 500 ? 500 : round($p[5]);
+				$p[5] = $p[5] < 0 ? 0 : round($p[5]);
+				$p[6] = $p[6] > 500 ? 500 : round($p[6]);
+				$p[6] = $p[6] < 0 ? 0 : round($p[6]);
+				$cmd = $p[5]." ".$p[6]." abs";
+				c($players[$name]." {$gry}teleports to (".$p[5].", ".$p[6].")!");
+			}
+			else {
+				$cmd = "30";
+				c($players[$name]." {$gry}teleports!");
+			}
 			s("TELEPORT ".$name." ".$cmd);
-			c($players[$name]." {$gry}teleports!");
 		}
 		else if($p[1] == "/a" || $p[1] == "/c")
 		{
@@ -172,7 +188,7 @@ while(!feof(STDIN))
 			if(!is_admin($p))
 				continue;
 			if($game->pickGame($p[2], $p[5], true))
-				$next_game = [$p[2], $p[5]];
+				$game->nextGame = [$p[2], $p[5]];
 		}
 		else if($p[1] == "/end")
 		{
@@ -194,23 +210,27 @@ while(!feof(STDIN))
 				continue;
 			if(empty($p[5]))
 			{
-				$tmp = $game->cur_game;
-				pm($p[2], "Round: ".$roundsPlayed." | Game: ".$tmp::$display_name." | Players: ".implode(", ",$players));
+				$tmp = get_class($game->cur_game);
+				pm($p[2], "Round: ".$game->roundsPlayed." | roundsTillDessert: ".$game->roundsTillDessert." | Players: ".implode(", ",$players));
 				continue;
 			}
 			if(is_numeric($p[5])) {
 				$input = abs(round($p[5]));
-				c("Admin: Setting round number to ".$input);
-				$roundsPlayed = $input;
+				$game->roundsTillDessert = ($input % $dessertRounds);
+				c("Admin: Setting dessert rounds left to ".$game->roundsTillDessert);
 			}
 			if($p[5] == "write") {
+				pm($p[2], $p[2].": saving data to file");
 				writePlayerToFile($p[2], $playerStat[$p[2]]);
 			}
 			if($p[5] == "read") {
-				if(!array_key_exists($p[2], $playerStat))
+				if(!array_key_exists($p[2], $playerStat)) {
+					pm($p[2], $p[2].": reading save data");
 					$playerStat[$p[2]] = readPlayerFromFile($p[2]);
+				}
 			}
 			if($p[5] == "credits") {
+				pm($p[2], $p[2]." is cheating!");
 				$playerStat[$p[2]]->credits = $p[6];
 			}
 		}
@@ -287,7 +307,7 @@ while(!feof(STDIN))
 	{   //TARGETZONE_PLAYER_ENTER 2 zonename 100 100 dukevin 90.8824 103.506 1 0 37.6366
 		$game->cur_game->targetZoneEnter($p);
 	}
-	if($p[0] == "ROUND_FINISHED" || $p[0] == "MATCH_ENDED")
+	if($p[0] == "ROUND_FINISHED" || $p[0] == "MATCH_ENDED") //if MATCH_ENDED is changed, update GameManager::nextRound()
 	{
 		$time_now = strtotime($p[2]);
 		if(abs($time_now - $time_last) < 12)
@@ -297,33 +317,47 @@ while(!feof(STDIN))
 			$ps->time += $game_time;
 			$ps->roundsPlayed++;
 		}
-		$game->cur_game->roundEnd();
-		$roundsPlayed++;  //increment roundsPlayed counter after game->roundEnd, map rotation scripts need it
-
+		Shop::$evt = "END";
+		$game->nextRound($p[0]);
 		if(!$enabled_dessert)
 			continue;
-		if($roundsPlayed % $dessertRounds == 0)
+		if($game->roundsTillDessert == 0) //time for dessert
 		{
-			if(!empty($next_game))
-				$game->pickGame($next_game[0], $next_game[1]);
-			else {
-				c("Picking dessert...");
-				$game->randomGame();
+			if(!empty($game->nextGame)) //play user-selected minigame
+				$game->pickGame($game->nextGame[0], $game->nextGame[1]);
+			else //play random dessert 
+			{
+				if(is_a($game->cur_game, "None")) //only play dessert if another one wasn't just playing
+				{
+					$game->cur_game = new None();
+					c("Picking dessert...");
+					$game->randomGame();
+				}
+				else { //play regular
+					unset($game->cur_game, $game->nextGame);
+					$game->cur_game = new None();
+				}
 			}
 		}
-		else if(!is_a($game->cur_game, "None") && ($roundsPlayed-1) % $dessertRounds == 0)
+		else if(!is_a($game->cur_game, "None") && $game->roundsTillDessert < 0) //end dessert 
 		{
-			unset($game->cur_game, $next_game);
+			unset($game->cur_game, $game->nextGame);
 			$game->cur_game = new None();
 		}
 		else
 		{
-			if(!is_a($game->cur_game, "None")) {
-				$tmp = $game->cur_game;
-				c("0xRESETT".$tmp::$display_name." plays for ".$pink.($dessertRounds-($roundsPlayed%$dessertRounds))."0xffffff more rounds");
+			if(!is_a($game->cur_game, "None")) 
+			{
+				$tmp = get_class($game->cur_game);
+				$str = "";
+				if($game->matchEndsGame())
+					$str = " or until match winner"; 
+				c("0xRESETT".$tmp::$display_name." plays for ".$pink.($game->roundsTillDessert)."0xffffff more rounds".$str);
 			}
-			else
-				c($pink.($dessertRounds-($roundsPlayed%$dessertRounds))."0xffffff more rounds until dessert");
+			else {
+				if($game->roundsTillDessert <= -1) $game->roundsTillDessert = $dessertRounds;
+				c($pink.($game->roundsTillDessert)."0xffffff more rounds until dessert");
+			}
 		}
 	}
 	if($p[0] == "ROUND_COMMENCING") //ROUND_COMMENCING 6 10
@@ -341,6 +375,7 @@ while(!feof(STDIN))
 			$bounty->survive();
 			$bounty = null;
 		}
+		Shop::$evt = "END";
 	}
 	if($p[0] == "ROUND_STARTED")
 	{
@@ -348,7 +383,7 @@ while(!feof(STDIN))
 			$game->cur_game->displayInfo();
 		else
 		{
-			if($roundsPlayed % 5 == 0 && count($players) >= 3)
+			if($game->roundsPlayed % 5 == 0 && count($players) >= 3)
 			{
 				$bounty = new Bounty(count($players));
 				continue;
@@ -363,6 +398,7 @@ while(!feof(STDIN))
 			}
 			c("0xffffff# 0xffaa92Be 0xaf5617s0xd39d59a0x86b325n0x789919d0xd12e15w0xa2548ei0xffb830c0xc27938h0xd2883fe0xd39d59d0xRESETT: 0xa0a0a0".$blurb);
 		}
+		Shop::$evt = $p[0];
 		$game->cur_game->roundStart();
 	}
 	if($p[0] == "PLAYER_ENTERED_GRID" || $p[0] == "PLAYER_RENAMED") //PLAYER_ENTERED_GRID uniquename 73.134.88.149 uniqueName //PLAYER_RENAMED uniquename dukevin@rx 73.134.88.149 1 uniqueName
@@ -611,6 +647,7 @@ class Shop
 		'/buffet'=>['name'=>"Buffet", 'cost'=>9, 'description'=>"Choose a dessert lasting for 10 rounds", 'command'=>"/buffet", 'type'=>"dessert"]
 	];
 	static $header = " Shop ";
+	static $evt = "";
 	static function view($p)
 	{
 		global $playerStat, $enabled_shop_non_respawns, $enabled_dessert;
@@ -645,6 +682,11 @@ class Shop
 		}
 		$game = GameManager::getInstance();
 		$mode = $game->cur_game;
+		if(Shop::$evt == "END")
+		{
+			pm($p, "The round has already ended.");
+			return false;
+		}
 		if(($cmd == "/speed" || $cmd == "/tel") && (is_a($mode,"htf") || is_a($mode,"ctf") || is_a($mode,"reflex") || is_a($mode,"fort")))
 		{
 			pm($p, "You cannot purchase ".$cmd." during ".$mode::$display_name);
@@ -744,17 +786,39 @@ class GameManager
 	private static $instance = null;
 	public $cur_game;
 	public static $games_list = ["shooting", "map", "axes", "sumo", "fort", "wildfort", "nano", "htf", "koh", "dz", "collecting", "turbo", "pets", "teams", "ctf", "macro", "bots", "longwall", "bone", "classic", "bombs", "reflex"];
+	public static $match_ends_games = ["ctf", "htf", "fort"]; //games which end when the match does instead of 10 rounds
 	private $games_available;
-
+	public $roundsPlayed;
+	public $roundsTillDessert;
+	public $nextGame;
 	public function __construct()
 	{
+		global $dessertRounds;
+		$this->roundsPlayed = 0;
+		$this->roundsTillDessert = $dessertRounds;
 		$this->cur_game = new None();
 		$this->games_available = GameManager::$games_list;
 		shuffle($this->games_available);
 	}
+	public function nextRound($evt)
+	{
+		global $dessertRounds;
+		$this->cur_game->roundEnd();
+		$this->roundsPlayed++;
+
+		if($evt == "MATCH_ENDED" && $this->matchEndsGame())
+			$this->endGame();
+		if($this->roundsTillDessert < 0)
+			$this->roundsTillDessert = $dessertRounds-1;
+		else
+			$this->roundsTillDessert--;
+	}
+	public function matchEndsGame()
+	{
+		return in_array(strtolower(get_class($this->cur_game)), GameManager::$match_ends_games) ? true : false;
+	}
 	public function reshuffle()
 	{
-		$this->cur_game = new None();
 		$this->games_available = GameManager::$games_list;
 		shuffle($this->games_available);
 		return $this->games_available[0];
@@ -803,9 +867,13 @@ class GameManager
 			s("CENTER_MESSAGE ".$str::$display_name);
 			$this->cur_game = new $str();
 		}
-		else {
-			if(empty($str)) {
-				c("Usage: /play <gametype>");
+		else 
+		{
+			if(empty($str)) 
+			{
+				if(empty($player))
+					c("ERROR: The script failed switching modes");
+				pm($player, "Usage: /play <gametype>");
 				return false;
 			}
 			c("Error: '".$str."' is not a valid minigame, available are: ".implode(", ",GameManager::$games_list));
@@ -815,10 +883,11 @@ class GameManager
 	}
 	public function endGame($player = null)
 	{
-		global $gry;
-		$game = $this->cur_game;
+		global $gry, $dessertRounds;
+		$game = get_class($this->cur_game);
 		if($player != null && $this->cur_game != null)
 			c("By order of 0xffffff".$player."{$gry}: The mode ".$game::$display_name." has ended");
+		$this->roundsTillDessert = $dessertRounds;
 		unset($this->cur_game);
 		$this->cur_game = new None();
 	}
@@ -884,9 +953,8 @@ class None extends Minigame
 	{	//just some essential settings in case something doesn't get set back right
 		s("SCORE_KILL 2");
 		s("ARENA_AXES 4");
-		s("WAIT_FOR_EXTERNAL_SCRIPT_TIMEOUT 0");
 		s("SIZE_FACTOR -3");
-		s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
+		s("WAIT_FOR_EXTERNAL_SCRIPT_TIMEOUT 0");
 		s("MAP_FILE Anonymous/polygon/regular/square-1.0.1.aamap.xml");
 	}
 	function __destruct()
@@ -937,21 +1005,19 @@ class Axes extends Minigame
 {
 	static $display_name = "Axes";
 	static $description = "The axes have changed";
-	static $initial_round = 0;
+	public $roundsPlayed = -1;
 	function __construct()
 	{
-		global $roundsPlayed;
-		Axes::$initial_round = $roundsPlayed;
-		$rand = mt_rand(3,8);
+		$rand = mt_rand(3,7);
 		if($rand == 4)
-			$rand = 6;
+			$rand = 8;
 		s("ARENA_AXES ".$rand);
 		Axes::$description = "The axes have changed to ".$rand;
 	}
 	function roundEnd()
 	{
-		global $roundsPlayed;
-		if(Axes::$initial_round == $roundsPlayed)
+		$this->roundsPlayed++;
+		if($this->roundsPlayed <= 0)
 			return;
 		$this->__construct(); //pick new axes for buffets
 	}
@@ -1068,11 +1134,9 @@ class Map extends Minigame
 	);
 	static $play = 0;
 	static $cur_map = "none";
-	static $initial_round = 0;
+	public $roundsPlayed = -1;
 	function __construct()
 	{
-		global $roundsPlayed;
-		Map::$initial_round == $roundsPlayed;
 		if(Map::$play == 0)
 			shuffle(Map::$maps);
 		$map_name = explode("-",Map::$maps[Map::$play]);
@@ -1097,8 +1161,8 @@ class Map extends Minigame
 	}
 	function roundEnd()
 	{
-		global $roundsPlayed;
-		if(Map::$initial_round == $roundsPlayed)
+		$this->roundsPlayed++;
+		if($this->roundsPlayed <= 0)
 			return;
 		$this->__construct();
 	}
@@ -1182,11 +1246,9 @@ class Wildfort extends Minigame
 	private $hint;
 	private $name;
 	private $settings = [];
-	static $initial_round = 0;
+	public $roundsPlayed = -1;
 	function __construct()
 	{
-		global $roundsPlayed;
-		Wildfort::$initial_round = $roundsPlayed;
 		s("INCLUDE teams.cfg");
 		s("INCLUDE fort.cfg");
 		s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
@@ -1216,8 +1278,8 @@ class Wildfort extends Minigame
 	}
 	function roundEnd()
 	{
-		global $roundsPlayed;
-		if(Wildfort::$initial_round == $roundsPlayed)
+		$this->roundsPlayed++;
+		if($this->roundsPlayed <= 0)
 			return;
 		while($this->settings)
 			undo(explode(" ",array_pop($this->settings))[0]);
@@ -1246,6 +1308,7 @@ class Fort extends Minigame
 		s("CYCLE_RESPAWN_ZONE 1");
 		s("CYCLE_RESPAWN_ZONE_GROWTH -0.001");
 		s("FORTRESS_CONQUERED_SCORE 10");
+		s("CYCLE_RESPAWN_ZONE_TYPE 1");
 		s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
 		s("MAP_FILE rxfreaks/classic/fort-1.2.aamap.xml");
 	}
@@ -1257,6 +1320,7 @@ class Fort extends Minigame
 		undo("SP_SIZE_FACTOR");
 		undo("CYCLE_RESPAWN_ZONE");
 		undo("FORTRESS_CONQUERED_SCORE");
+		undo("CYCLE_RESPAWN_ZONE_TYPE");
 		s("MAP_FILE Anonymous/polygon/regular/square-1.0.1.aamap.xml");
 	}
 }
@@ -1424,7 +1488,7 @@ class Bone extends Minigame
 	function roundStart()
 	{
 		s("SPAWN_ZONE rubber L 100 100 100 400 400 400 400 100 Z 20 0 0 30 -0.2 false 4.5 9 15 0");
-		s("SPAWN_ZONE rubber L 400 100 400 400 100 400 100 100 Z 20 0 0 30 -0.2 false 4.5 9 15 0");
+		s("SPAWN_ZONE rubber L 400 100 400 400 100 400 100 100 Z 20 0 0 -30 -0.2 false 4.5 9 15 0");
 	}
 	function __destruct()
 	{
@@ -1618,6 +1682,8 @@ class Ctf extends Minigame
 	static $description = "Take the opponent's flag and bring it home 0x808080(Flag capture = 15pts)";
 	function __construct()
 	{
+		s("LIMIT_SCORE 15"); //temporarily let normal mode award match winner before scores are cleared
+		s("START_NEW_MATCH");
 		s("INCLUDE teams.cfg");
 		s("INCLUDE ctf.cfg");
 	}
@@ -1645,31 +1711,31 @@ class Reflex extends Minigame
 	static $display_name = "Reflex Challenge";
 	static $description = "Test your reflexes by racing to the finish 0x808080(1st = 10 pts, 2nd = 8 pts, 3rd = 6 pts, Finishing = 4 pts)";
 	static $play = 0;
-	static $initial_round = 0;
+	public $roundsPlayed = -1;
 	public $cur_map;
 	public $settings = [];
 	private $winners = [];
 	private $first = 999;
 	static $maps = [
 		"Reflex Tunnel | rxfreaks/race/tunnel-6.aamap.xml | SIZE_FACTOR -7 | SP_SIZE_FACTOR -7",
-		"Spiral | rxfreaks/race/spiral-9.aamap.xml | SIZE_FACTOR -5 | SP_SIZE_FACTOR -5",
+		"Spiral | rxfreaks/race/spiral-9.aamap.xml | SIZE_FACTOR -5 | SP_SIZE_FACTOR -5 | CYCLE_START_SPEED 80 | CYCLE_SPEED_DECAY_ABOVE 0.1 ",
 		"3mazes | Light/race/3mazes-1.0.2.aamap.xml| SIZE_FACTOR -3 | SP_SIZE_FACTOR -3",
 		"ZigZag | Light/race/zigzag-1.0.2.aamap.xml| SIZE_FACTOR -4 | SP_SIZE_FACTOR -4",
 		"DoubleBind | rxfreaks/race/doublebind-3.aamap.xml| SIZE_FACTOR -6 | SP_SIZE_FACTOR -6",
 		"Maze | Light/race/dungeon-1.0.1.aamap.xml | SIZE_FACTOR -6 | SP_SIZE_FACTOR -6",
 		"Grind | rxfreaks/race/blah-2.4.aamap.xml | CYCLE_RUBBER 10 ",
-		"Intestines |  rxfreaks/race/maze-7.1.aamap.xml | SIZE_FACTOR -7.5 | SP_SIZE_FACTOR -7.5 | SPAWN_WINGMEN_SIDE 0",
+		"Intestines |  rxfreaks/race/maze-7.2.aamap.xml | SIZE_FACTOR -7.5 | SP_SIZE_FACTOR -7.5 | SPAWN_WINGMEN_SIDE 0",
 		"Octagone | rxfreaks/race/octa-10.aamap.xml | SIZE_FACTOR -7 | SP_SIZE_FACTOR -7",
 		"Microhell | pdbq/race/microhell-1.0.3.aamap.xml | SIZE_FACTOR -5 | SP_SIZE_FACTOR -5 "
 	];
 	function __construct()
 	{
-		global $roundsPlayed;
-		Reflex::$initial_round = $roundsPlayed;
 		s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
 		s("INCLUDE reflex.cfg");
-		if(Reflex::$play == 0)
+		if(Reflex::$play == 0) {
 			shuffle(Reflex::$maps);
+			c("0xRESETTShuffled maps.");
+		}
 		$ar = explode("|", Reflex::$maps[Reflex::$play]);
 		$this->cur_map = trim($ar[0]);
 		for($i=1; $i<count($ar); $i++)
@@ -1694,8 +1760,8 @@ class Reflex extends Minigame
 	}
 	function roundEnd()
 	{
-		global $roundsPlayed;
-		if(Reflex::$initial_round == $roundsPlayed)
+		$this->roundsPlayed++;
+		if($this->roundsPlayed <= 0)
 			return;
 		while($this->settings)
 			undo(explode(" ",array_pop($this->settings))[0]);
@@ -1711,24 +1777,24 @@ class Reflex extends Minigame
 		$time = array_pop($e);
 		if(count($this->winners) == 1)
 		{
-			c($players[$winner].$gry." finished the reflex challenge 1st [0x80ff80".$time."s{$gry}]! (10 pts)");
+			c($players[$winner].$gry." finished the reflex challenge 1st in 0x80ff80".$time."s{$gry}! (10 pts)");
 			s("ADD_SCORE_PLAYER ".$winner." 10");
 			$this->first = $time;
 			s("RACE_END_DELAY ".round($time/2));
 		}
 		else if(count($this->winners) == 2)
 		{
-			c($players[$winner].$gry." finished the reflex challenge 2nd [0xff8080+".($time-$this->first)."s{$gry}]! (8 pts)");
+			c($players[$winner].$gry." finished the reflex challenge 2nd in 0xff8080+".($time-$this->first)."s{$gry}! (8 pts)");
 			s("ADD_SCORE_PLAYER ".$winner." 8");
 		}
 		else if(count($this->winners) == 3)
 		{
-			c($players[$winner].$gry." finished the reflex challenge 3rd [0xff8080+".($time-$this->first)."s{$gry}]! (6 pts)");
+			c($players[$winner].$gry." finished the reflex challenge 3rd in 0xff8080+".($time-$this->first)."s{$gry}! (6 pts)");
 			s("ADD_SCORE_PLAYER ".$winner." 6");
 		}
 		else
 		{
-			c($players[$winner].$gry." finished the reflex challenge ".count($this->winners)."th [0xff8080+".($time-$this->first)."s{$gry}]! (4 pts)");
+			c($players[$winner].$gry." finished the reflex challenge ".count($this->winners)."th in 0xff8080+".($time-$this->first)."s{$gry}! (4 pts)");
 			s("ADD_SCORE_PLAYER ".$winner." 4");
 		}
 		if(count($this->winners) == count($players))
@@ -1737,7 +1803,6 @@ class Reflex extends Minigame
 	function __destruct()
 	{
 		unload("reflex.cfg");
-		$this->cur_map = "";
 		s("MAP_FILE Anonymous/polygon/regular/square-1.0.1.aamap.xml");
 		foreach($this->settings as $s)
 			undo(explode(" ",$s)[0]);
