@@ -1,8 +1,9 @@
 #!/usr/bin/php
 <?php
+/* Created by dukevin (dukevinjduke@gmail.com) 2022 */
 /* Requires to be started with SPAWN_SCRIPT so getenv works. +ap required*/
 /* Bugs: Some fort mode zones don't spawn like tele zones, spectators stay in $players arr*/
-/* New features to add: disco fog mode, ball team killing, camping, disable overwriting of modes by players if not enough time passed, /mix for adding physics to modes*/
+/* New features to add: disco fog mode, disable overwriting of modes by players if not enough time passed, /mix for adding physics to modes*/
 
 $dir = "/home/duke/aa/servers/sandwich/var/";
 $dessertRounds = 10;				//serve dessert (play a minigame) after this many rounds
@@ -32,7 +33,7 @@ $time_last = strtotime("00:00:00");
 c(basename(__FILE__)." started succesfully");
 while(!feof(STDIN))
 {
-	$line = rtrim(fgets(STDIN, 1024));
+	$line = rtrim(fgets(STDIN));
 	$p = explode(" ", $line);
 	if($p[0] == "INVALID_COMMAND") //INVALID_COMMAND /missile dukevin@rx 73.134.88.149 -2 fl
 	{
@@ -66,6 +67,10 @@ while(!feof(STDIN))
 		{
 			if(feature_disabled($p[2], $enabled_shop)) continue;
 			$p[1] = "/res";
+			if(is_a($game->cur_game, "camping")) {
+				pm($name, "You cannot respawn during this mode.");
+				continue;
+			}
 			if(Shop::buy($p[2],$p[1])) 
 			{
 				$str = "";
@@ -147,6 +152,10 @@ while(!feof(STDIN))
 			$p[1] = "/tel"; 
 			if(feature_disabled($p[2], ($enabled_shop_non_respawns && $enabled_shop))) continue;
 			$name = $p[2];
+			if(is_a($game->cur_game, "camping")) {
+				pm($name, "You cannot teleport during this mode.");
+				continue;
+			}
 			if($playerStat[$name]->teles <= 0)
 			{
 				if(!Shop::buy($name, $p[1])) 
@@ -291,7 +300,7 @@ while(!feof(STDIN))
 			pm($p[2], "Invalid command ".$p[1].", try: 0xffffff/stats /ladder".$cmds);
 			if(is_admin($p, false)) {
 				if($enabled_dessert)
-					$cmd .= "/playlist /play /end /reshuffle /rounds_served";
+					$cmd .= "/playlist /play /end /reshuffle /rounds_served ";
 				pm($p[2], "0x808080Admin commands: ".$cmd." /features /debug");
 			}
 		}
@@ -491,10 +500,13 @@ while(!feof(STDIN))
 		foreach($players as $i=>$_)
 			printStats($i);
 	}
-	if(preg_match("/^DEATH_FRAG|DEATH_ZOMBIEZONE|DEATH_SHOT_FRAG|DEATH_DEATHZONE|DEATH_SHOT_SUICIDE|DEATH_RUBBERZONE/", $line))
+	if(preg_match("/^DEATH_FRAG|DEATH_ZOMBIEZONE|DEATH_SHOT_FRAG|DEATH_DEATHZONE|DEATH_SHOT_SUICIDE|DEATH_RUBBERZONE|DEATH_SUICIDE/", $line))
 	{
 		if(!array_key_exists($p[1], $playerStat))
 			continue;
+		$game->cur_game->playerDied($p[1]);
+		if($p[0] == "DEATH_SUICIDE") continue;
+
 		$playerStat[$p[1]]->deaths += 1;
 		if(!empty($p[2]))
 			if(array_key_exists($p[2], $playerStat))
@@ -687,7 +699,7 @@ class Shop
 			pm($p, "The round has already ended.");
 			return false;
 		}
-		if(($cmd == "/speed" || $cmd == "/tel") && (is_a($mode,"htf") || is_a($mode,"ctf") || is_a($mode,"reflex") || is_a($mode,"fort")))
+		if(($cmd == "/speed" || $cmd == "/tel") && (is_a($mode,"htf") || is_a($mode,"ctf") || is_a($mode,"reflex") || is_a($mode,"fort") || is_a($mode,"camping")))
 		{
 			pm($p, "You cannot purchase ".$cmd." during ".$mode::$display_name);
 			return false;
@@ -785,7 +797,7 @@ class GameManager
 {
 	private static $instance = null;
 	public $cur_game;
-	public static $games_list = ["shooting", "map", "axes", "sumo", "fort", "wildfort", "nano", "htf", "koh", "dz", "collecting", "turbo", "pets", "teams", "ctf", "macro", "bots", "longwall", "bone", "classic", "bombs", "reflex"];
+	public static $games_list = ["shooting", "map", "axes", "sumo", "fort", "wildfort", "nano", "htf", "koh", "dz", "collecting", "turbo", "pets", "teams", "ctf", "macro", "bots", "longwall", "bone", "classic", "bombs", "reflex", "dodgeball", "camping"];
 	public static $match_ends_games = ["ctf", "htf", "fort"]; //games which end when the match does instead of 10 rounds
 	private $games_available;
 	public $roundsPlayed;
@@ -939,6 +951,7 @@ abstract class Minigame
 	public function roundStart() {}					//triggered when the ROUND_COMMENCING event happens, good time to spawn zones
 	public function roundEnd() {}					//triggered when ROUND_FINIED|MATCH_ENDED, good time to pick new randoms for a buffet
 	public function playercmd($player) {pm($player, "This mode has no special action you can perform.");} //player typed /a
+	public function playerDied($player) {} 			//triggered when a player died
 	public function displayInfo() {
 		global $pink;
 		c($pink."# DESSERT MINIGAME: 0xffff00".static::$display_name.$pink." :: 0xffffff".static::$description);
@@ -1142,13 +1155,11 @@ class Map extends Minigame
 		$map_name = explode("-",Map::$maps[Map::$play]);
 		if($map_name[1] < 1000) //its not a wik map
 		{
-			s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
 			s("MAP_FILE rxfreaks/hft/".Map::$maps[Map::$play].".aamap.xml");
 			Map::$cur_map = $map_name[0];
 		}
 		else
 		{
-			s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
 			s("MAP_FILE Wik/dogfight/".Map::$maps[Map::$play].".aamap.xml");
 			Map::$cur_map = $map_name[0];
 		}
@@ -1169,7 +1180,6 @@ class Map extends Minigame
 	function __destruct()
 	{
 		Map::$cur_map = "none";
-		s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
 		s("MAP_FILE Anonymous/polygon/regular/square-1.0.1.aamap.xml");
 	}
 }
@@ -1251,7 +1261,6 @@ class Wildfort extends Minigame
 	{
 		s("INCLUDE teams.cfg");
 		s("INCLUDE fort.cfg");
-		s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
 		$line = explode("|",Wildfort::$maps[mt_rand(0,sizeof(Wildfort::$maps)-1)]);
 		foreach($line as $i => $l)
 		{
@@ -1291,7 +1300,6 @@ class Wildfort extends Minigame
 			undo(explode(" ",$s)[0]);
 		unload("fort.cfg");
 		unload("teams.cfg");
-		s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
 		s("MAP_FILE Anonymous/polygon/regular/square-1.0.1.aamap.xml");
 	}
 }
@@ -1309,7 +1317,6 @@ class Fort extends Minigame
 		s("CYCLE_RESPAWN_ZONE_GROWTH -0.001");
 		s("FORTRESS_CONQUERED_SCORE 10");
 		s("CYCLE_RESPAWN_ZONE_TYPE 1");
-		s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
 		s("MAP_FILE rxfreaks/classic/fort-1.2.aamap.xml");
 	}
 	function __destruct()
@@ -1650,7 +1657,6 @@ class Htf extends Minigame
 		s("FLAG_HOLD_TIME 21");
 		s("FLAG_DROP_TIME 4");
 		s("FLAG_HOLD_TIME_DROP 1");
-		s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
 		s("MAP_FILE rxfreaks/custom/htfdzquadcross-7.aamap.xml");
 	}
 	function timedEvents($time)
@@ -1730,7 +1736,6 @@ class Reflex extends Minigame
 	];
 	function __construct()
 	{
-		s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
 		s("INCLUDE reflex.cfg");
 		if(Reflex::$play == 0) {
 			shuffle(Reflex::$maps);
@@ -1806,6 +1811,130 @@ class Reflex extends Minigame
 		s("MAP_FILE Anonymous/polygon/regular/square-1.0.1.aamap.xml");
 		foreach($this->settings as $s)
 			undo(explode(" ",$s)[0]);
+	}
+}
+class Dodgeball extends Minigame
+{
+	static $display_name = "Dodgeball";
+	static $description = "Hit the enemy team with your ball. Brakes or grind to boost. 0x808080(5 pts for kills)";
+	function __construct()
+	{
+		s("MAP_FILE rxfreaks/custom/dodgeball-1.aamap.xml");
+		s("INCLUDE teams.cfg");
+		s("BALL_KILLS 1");
+		s("ZONE_SPEED_HIT_DECAY 15");
+		s("CYCLE_WALLS_LENGTH 125");
+		s("WALLS_LENGTH 125");
+		s("SP_WALLS_LENGTH 125");
+		s("CYCLE_RUBBER 20");
+		s("CYCLE_ACCEL 50");
+		s("SCORE_KILL 5");
+		s("CYCLE_BRAKE -10");
+		s("CYCLE_ACCEL_SLINGSHOT 1.5");
+	}
+	function roundStart()
+	{
+		s("SPAWN_ZONE ballTeam blueberries 250 150 32 0.01");
+		s("SPAWN_ZONE ballTeam bananas 250 350 32 0.01");
+	}
+	function __destruct()
+	{
+		undo("BALL_KILLS");
+		undo("ZONE_SPEED_HIT_DECAY");
+		undo("CYCLE_WALLS_LENGTH");
+		undo("WALLS_LENGTH");
+		undo("SP_WALLS_LENGTH");
+		undo("CYCLE_RUBBER");
+		undo("CYCLE_ACCEL");
+		undo("SCORE_KILL");
+		undo("CYCLE_BRAKE");
+		undo("CYCLE_ACCEL_SLINGSHOT");
+		unload("teams.cfg");
+	}
+}
+class Camping extends Minigame
+{
+	static $display_name = "Camping";
+	static $description = "Survive as long as you can. You have 3 attempts 0x808080(5 pts for last standing)";
+	static $level2_spawns = ["40 296", "136 296", "232 296", "328 296", "424 296", "40 216", "136 216", "232 216", "328 216", "424 216"];
+	static $level3_spawns = ["40 104", "136 104", "232 104", "328 104", "424 104", "40 24", "136 24", "232 24", "328 24", "424 24"];
+	public $player_levels;
+	public $time;
+	public $level2_spawns_remaining;
+	public $level3_spawns_remaining;
+	function __construct()
+	{
+		s("MAP_FILE rxfreaks/custom/camping-2.aamap.xml");
+		s("CYCLE_RUBBER 5");
+		s("CYCLE_WALLS_LENGTH -1");
+		s("WALLS_LENGTH -1");
+		s("SP_WALLS_LENGTH -1");
+		s("WALLS_STAY_UP_DELAY -1");
+		s("SP_WALLS_STAY_UP_DELAY -1");
+		s("GAME_TYPE 0");
+		s("SP_GAME_TYPE 0");
+		s("KILL_ALL");
+	}
+	function roundStart()
+	{
+		$this->level2_spawns_remaining = Camping::$level2_spawns;
+		$this->level3_spawns_remaining = Camping::$level3_spawns;
+		global $players;
+		foreach($players as $p=>$_)
+			$this->player_levels[$p] = 1;
+		$this->time = microtime(true);
+	}
+	function playerDied($player)
+	{
+		if(!array_key_exists($player, $this->player_levels))
+			$this->player_levels[$player] = 1;
+		$this->player_levels[$player]++;
+		if($this->player_levels[$player] == 2)
+		{
+			pm($player, "Round 2 of 3, start!");
+			$coord = array_pop($this->level2_spawns_remaining);
+			if(!$coord) $coord = Camping::$level2_spawns[0];
+			s("RESPAWN_PLAYER ".$player." ".$coord." 1 0");
+		}
+		if($this->player_levels[$player] == 3)
+		{
+			pm($player, "Round 3 of 3, start!");
+			$coord = array_pop($this->level3_spawns_remaining);
+			if(!$coord) $coord = Camping::$level3_spawns[0];
+			s("RESPAWN_PLAYER ".$player." ".$coord." 1 0");
+		}
+		if($this->player_levels[$player] > 3)
+		{
+			$time = round(microtime(true)-$this->time, 2);
+			global $players, $gry;
+			c($players[$player]."{$gry} survived for 0xRESETT".$time."s");
+			$alive = "";
+			foreach($this->player_levels as $p=>$l)
+			{
+				if($l <= 3) 
+				{
+					if($alive != "") //someone else is alive
+						return;
+					$alive = $p;
+				}
+			}
+			if(empty($alive))
+				return;
+			s("ADD_SCORE_PLAYER ".$alive." 5");
+			c($players[$alive]."0x00ffff won 5 points for surviving.");
+		}
+	}
+	function __destruct()
+	{
+		s("MAP_FILE Anonymous/polygon/regular/square-1.0.1.aamap.xml");
+		undo("CYCLE_RUBBER");
+		undo("WALLS_STAY_UP_DELAY");
+		undo("SP_WALLS_STAY_UP_DELAY");
+		undo("CYCLE_WALLS_LENGTH");
+		undo("WALLS_LENGTH");
+		undo("SP_WALLS_LENGTH");
+		undo("GAME_TYPE");
+		undo("SP_GAME_TYPE");
 	}
 }
 
