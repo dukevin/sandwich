@@ -2,7 +2,7 @@
 <?php
 /* Created by dukevin (dukevinjduke@gmail.com) 2022 */
 /* Requires to be started with SPAWN_SCRIPT so getenv works. +ap required*/
-/* Bugs: Some fort mode zones don't spawn like tele zones, spectators stay in $players arr*/
+/* Bugs: Some fort mode zones don't spawn like tele zones, spectators stay in $players arr, not saving new players, dodgeball gets stuck, /tel said 'round already over' when it wasn't, winning points in camping to match win ends game*/
 /* New features to add: disco fog mode, disable overwriting of modes by players if not enough time passed, /mix for adding physics to modes*/
 
 $dir = "/home/duke/aa/servers/sandwich/var/";
@@ -113,7 +113,9 @@ while(!feof(STDIN))
 				continue;
 			}
 			if(Shop::buy($p[2], $p[1])) {
-				c($players[$p[2]]." {$gry}orders {$pink}".$p[5]::$display_name."{$gry} for the next dessert! (in ".($game->roundsTillDessert)." rounds)");
+				$tmp = $game->roundsTillDessert;
+				if($tmp <= 0) $tmp = $dessertRounds;
+				c($players[$p[2]]." {$gry}orders {$pink}".$p[5]::$display_name."{$gry} for the next dessert! (in ".$tmp." rounds)");
 				$game->nextGame = [$p[2], $p[5]];
 			}
 		}
@@ -374,6 +376,7 @@ while(!feof(STDIN))
 		unset($ais, $turbos);
 		$ais = array();
 		$turbos = array();
+		Shop::$evt = $p[0];
 	}
 	if($p[0] == "ROUND_WINNER")
 	{
@@ -388,6 +391,7 @@ while(!feof(STDIN))
 	}
 	if($p[0] == "ROUND_STARTED")
 	{
+		Shop::$evt = $p[0];
 		if(!is_a($game->cur_game, "None"))
 			$game->cur_game->displayInfo();
 		else
@@ -407,7 +411,6 @@ while(!feof(STDIN))
 			}
 			c("0xffffff# 0xffaa92Be 0xaf5617s0xd39d59a0x86b325n0x789919d0xd12e15w0xa2548ei0xffb830c0xc27938h0xd2883fe0xd39d59d0xRESETT: 0xa0a0a0".$blurb);
 		}
-		Shop::$evt = $p[0];
 		$game->cur_game->roundStart();
 	}
 	if($p[0] == "PLAYER_ENTERED_GRID" || $p[0] == "PLAYER_RENAMED") //PLAYER_ENTERED_GRID uniquename 73.134.88.149 uniqueName //PLAYER_RENAMED uniquename dukevin@rx 73.134.88.149 1 uniqueName
@@ -460,7 +463,6 @@ while(!feof(STDIN))
 		if(!array_key_exists($p[1], $playerStat))
 			continue;
 		$playerStat[$p[1]]->time += $game_time;
-		printStats($p[1], false, $players[$p[1]]);
 		if(!is_auth($p[1]) && $playerStat[$p[1]]->time < 600 || !array_key_exists($p[1], $playerStat)) 
 		{ 
 			if(!array_key_exists($p[1], $playerStat))
@@ -468,8 +470,10 @@ while(!feof(STDIN))
 			else
 				c("Not saving data for ".$p[1]." (not logged in and played less than 10 mins)");
 		}
-		else
+		else {
+			printStats($p[1], false, $players[$p[1]]);
 			writePlayerToFile($p[1], $playerStat[$p[1]]);
+		}
 		unset($playerStat[$p[1]]);
 		unset($players[$p[1]]);
 	}
@@ -720,13 +724,13 @@ class Bounty
 		if(!$enabled_bounty)
 			return;
 		if($num <= 3)
-			$bounty = array_rand([1, 2]);
+			$bounty = array_rand(array_flip([1, 2]));
 		else if($num == 4)
-			$bounty = array_rand([2, 2, 3]);
+			$bounty = array_rand(array_flip([2, 2, 3]));
 		else if($num == 5)
-			$bounty = array_rand([3, 3, 4]);
+			$bounty = array_rand(array_flip([3, 3, 4]));
 		else if($num == 6)
-			$bounty = array_rand([3,4,4,5,5]);
+			$bounty = array_rand(array_flip([3,4,4,5,5]));
 		else if($num > 6)
 			$bounty = 5;
 		$this->amount = $bounty;
@@ -1692,6 +1696,7 @@ class Ctf extends Minigame
 		s("START_NEW_MATCH");
 		s("INCLUDE teams.cfg");
 		s("INCLUDE ctf.cfg");
+		s("CENTER_MESSAGE Capture the Flag");
 	}
 	function __destruct()
 	{
@@ -1816,7 +1821,7 @@ class Reflex extends Minigame
 class Dodgeball extends Minigame
 {
 	static $display_name = "Dodgeball";
-	static $description = "Hit the enemy team with your ball. Brakes or grind to boost. 0x808080(5 pts for kills)";
+	static $description = "Hit the enemy team with your ball. Brakes (v) are boost. 0x808080(5 pts for kills)";
 	function __construct()
 	{
 		s("MAP_FILE rxfreaks/custom/dodgeball-1.aamap.xml");
@@ -1829,11 +1834,14 @@ class Dodgeball extends Minigame
 		s("CYCLE_RUBBER 20");
 		s("CYCLE_ACCEL 50");
 		s("SCORE_KILL 5");
+		s("SCORE_WIN 0");
 		s("CYCLE_BRAKE -10");
 		s("CYCLE_ACCEL_SLINGSHOT 1.5");
+		s("BALL_CYCLE_ACCEL_BOOST 20");
 	}
 	function roundStart()
 	{
+		c("0xRESETTHint: Hitting your ball while pressing the boost button will launch it very quickly.");
 		s("SPAWN_ZONE ballTeam blueberries 250 150 32 0.01");
 		s("SPAWN_ZONE ballTeam bananas 250 350 32 0.01");
 	}
@@ -1848,14 +1856,16 @@ class Dodgeball extends Minigame
 		undo("CYCLE_ACCEL");
 		undo("SCORE_KILL");
 		undo("CYCLE_BRAKE");
+		undo("SCORE_WIN");
 		undo("CYCLE_ACCEL_SLINGSHOT");
+		s("BALL_CYCLE_ACCEL_BOOST");
 		unload("teams.cfg");
 	}
 }
 class Camping extends Minigame
 {
 	static $display_name = "Camping";
-	static $description = "Survive as long as you can. You have 3 attempts 0x808080(5 pts for last standing)";
+	static $description = "Survive as long as you can on 3 stages 0x808080(5 pts for last standing)";
 	static $level2_spawns = ["40 296", "136 296", "232 296", "328 296", "424 296", "40 216", "136 216", "232 216", "328 216", "424 216"];
 	static $level3_spawns = ["40 104", "136 104", "232 104", "328 104", "424 104", "40 24", "136 24", "232 24", "328 24", "424 24"];
 	public $player_levels;
@@ -1873,6 +1883,11 @@ class Camping extends Minigame
 		s("SP_WALLS_STAY_UP_DELAY -1");
 		s("GAME_TYPE 0");
 		s("SP_GAME_TYPE 0");
+		s("CYCLE_INVULNERABLE_TIME 0");
+		s("ZONE_ALPHA_SERVER 0");
+		s("CYCLE_WALL_TIME 3");
+		s("CYCLE_START_SPEED 10");
+		s("EXPLOSION_RADIUS 0");
 		s("KILL_ALL");
 	}
 	function roundStart()
@@ -1882,7 +1897,11 @@ class Camping extends Minigame
 		global $players;
 		foreach($players as $p=>$_)
 			$this->player_levels[$p] = 1;
-		$this->time = microtime(true);
+	}
+	function timedEvents($time)
+	{
+		if($time == 0)
+			$this->time = microtime(true);
 	}
 	function playerDied($player)
 	{
@@ -1891,17 +1910,19 @@ class Camping extends Minigame
 		$this->player_levels[$player]++;
 		if($this->player_levels[$player] == 2)
 		{
-			pm($player, "Round 2 of 3, start!");
+			pm($player, "Get ready for stage 2...");
 			$coord = array_pop($this->level2_spawns_remaining);
 			if(!$coord) $coord = Camping::$level2_spawns[0];
-			s("RESPAWN_PLAYER ".$player." ".$coord." 1 0");
+			s("DELAY_COMMAND +1 SPAWN_ZONE rubberadjust ".$coord." 50 -5 0 0 0");
+			s("DELAY_COMMAND +1 RESPAWN_PLAYER ".$player." ".$coord." 1 0");
 		}
 		if($this->player_levels[$player] == 3)
 		{
-			pm($player, "Round 3 of 3, start!");
+			pm($player, "Get ready for stage 3...");
 			$coord = array_pop($this->level3_spawns_remaining);
 			if(!$coord) $coord = Camping::$level3_spawns[0];
-			s("RESPAWN_PLAYER ".$player." ".$coord." 1 0");
+			s("DELAY_COMMAND +1 SPAWN_ZONE rubberadjust ".$coord." 50 -5 0 0 0");
+			s("DELAY_COMMAND +1 RESPAWN_PLAYER ".$player." ".$coord." 1 0");
 		}
 		if($this->player_levels[$player] > 3)
 		{
@@ -1915,13 +1936,13 @@ class Camping extends Minigame
 				{
 					if($alive != "") //someone else is alive
 						return;
-					$alive = $p;
+					$alive = trim($p);
 				}
 			}
 			if(empty($alive))
 				return;
 			s("ADD_SCORE_PLAYER ".$alive." 5");
-			c($players[$alive]."0x00ffff won 5 points for surviving.");
+			c($players[$alive]."0xffffff won 5 points for being the last alive.");
 		}
 	}
 	function __destruct()
@@ -1935,6 +1956,11 @@ class Camping extends Minigame
 		undo("SP_WALLS_LENGTH");
 		undo("GAME_TYPE");
 		undo("SP_GAME_TYPE");
+		undo("CYCLE_INVULNERABLE_TIME");
+		undo("ZONE_ALPHA_SERVER");
+		undo("CYCLE_WALL_TIME");
+		undo("CYCLE_START_SPEED");
+		undo("EXPLOSION_RADIUS");
 	}
 }
 
