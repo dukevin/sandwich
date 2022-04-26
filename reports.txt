@@ -1,3 +1,1 @@
-[2022/03/27-15:34:18] 74.82.244.18 Obsi@forums dessert said classic physics, but it still loaded a reflex map, no small square no wall
-[2022/03/27-15:34:41] 74.82.244.18 Obsi@forums also the map that starts with zigzags 10 rubber has a shortcut
-[2022/03/27-15:35:40] 74.82.244.18 Obsi@forums tried to load settings_custom.cfg but it says admin not mod
+

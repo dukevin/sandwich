@@ -2,8 +2,8 @@
 <?php
 /* Created by dukevin (dukevinjduke@gmail.com) 2022 */
 /* Requires to be started with SPAWN_SCRIPT so getenv works. +ap required*/
-/* Bugs: Some fort mode zones don't spawn like tele zones, spectators stay in $players arr, not saving new players, dodgeball gets stuck, /tel said 'round already over' when it wasn't, winning points in camping to match win ends game*/
-/* New features to add: disco fog mode, disable overwriting of modes by players if not enough time passed, /mix for adding physics to modes*/
+/* Bugs: Some fort mode zones don't spawn like tele zones, spectators stay in $players arr*/
+/* New features to add: disco fog mode, highscores for camping, /mix for adding physics to modes, football delivery mode*/
 
 $dir = "/home/duke/aa/servers/sandwich/var/";
 $dessertRounds = 10;				//serve dessert (play a minigame) after this many rounds
@@ -1105,7 +1105,7 @@ class Collecting extends Minigame
 		if($time >= 100 && $time % 5 == 0) 
 		{
 			if($time == 100)
-				c("Deathzones incomming!");
+				c("Deathzones incoming!");
 			$speed = mt_rand(-100,100);
 			s("SPAWN_ZONE death ".mt_rand(10,490)." ".mt_rand(10,490)." 12 0 ".$speed." ".$speed." true 255 0 0 0 1");
 		}
@@ -1821,45 +1821,23 @@ class Reflex extends Minigame
 class Dodgeball extends Minigame
 {
 	static $display_name = "Dodgeball";
-	static $description = "Hit the enemy team with your ball. Brakes (v) are boost. 0x808080(5 pts for kills)";
+	static $description = "Hit the enemy team with your ball. Brakes (v) to hit the ball. 0x808080(5 pts for kills)";
 	function __construct()
 	{
-		s("MAP_FILE rxfreaks/custom/dodgeball-1.aamap.xml");
-		s("INCLUDE teams.cfg");
-		s("BALL_KILLS 1");
-		s("ZONE_SPEED_HIT_DECAY 15");
-		s("CYCLE_WALLS_LENGTH 125");
-		s("WALLS_LENGTH 125");
-		s("SP_WALLS_LENGTH 125");
-		s("CYCLE_RUBBER 20");
-		s("CYCLE_ACCEL 50");
-		s("SCORE_KILL 5");
-		s("SCORE_WIN 0");
-		s("CYCLE_BRAKE -10");
-		s("CYCLE_ACCEL_SLINGSHOT 1.5");
-		s("BALL_CYCLE_ACCEL_BOOST 20");
+		//BUG: Ball can sometimes get stuck against the wall
+		s("include dodgeball.cfg");
 	}
 	function roundStart()
 	{
-		c("0xRESETTHint: Hitting your ball while pressing the boost button will launch it very quickly.");
+		s("CYCLE_RUBBER 20");
+		c("0xRESETTHint: Press brakes (v) to hit the ball quickly.");
 		s("SPAWN_ZONE ballTeam blueberries 250 150 32 0.01");
 		s("SPAWN_ZONE ballTeam bananas 250 350 32 0.01");
 	}
 	function __destruct()
 	{
-		undo("BALL_KILLS");
-		undo("ZONE_SPEED_HIT_DECAY");
-		undo("CYCLE_WALLS_LENGTH");
-		undo("WALLS_LENGTH");
-		undo("SP_WALLS_LENGTH");
-		undo("CYCLE_RUBBER");
-		undo("CYCLE_ACCEL");
-		undo("SCORE_KILL");
-		undo("CYCLE_BRAKE");
-		undo("SCORE_WIN");
-		undo("CYCLE_ACCEL_SLINGSHOT");
-		s("BALL_CYCLE_ACCEL_BOOST");
 		unload("teams.cfg");
+		unload("dodgeball.cfg");
 	}
 }
 class Camping extends Minigame
@@ -1875,6 +1853,7 @@ class Camping extends Minigame
 	function __construct()
 	{
 		s("MAP_FILE rxfreaks/custom/camping-2.aamap.xml");
+		s("CYCLE_ACCEL 4");
 		s("CYCLE_RUBBER 5");
 		s("CYCLE_WALLS_LENGTH -1");
 		s("WALLS_LENGTH -1");
@@ -1913,7 +1892,7 @@ class Camping extends Minigame
 			pm($player, "Get ready for stage 2...");
 			$coord = array_pop($this->level2_spawns_remaining);
 			if(!$coord) $coord = Camping::$level2_spawns[0];
-			s("DELAY_COMMAND +1 SPAWN_ZONE rubberadjust ".$coord." 50 -5 0 0 0");
+			s("DELAY_COMMAND +1 SPAWN_ZONE rubber ".$coord." 50 -5 0 0 -50");
 			s("DELAY_COMMAND +1 RESPAWN_PLAYER ".$player." ".$coord." 1 0");
 		}
 		if($this->player_levels[$player] == 3)
@@ -1921,7 +1900,7 @@ class Camping extends Minigame
 			pm($player, "Get ready for stage 3...");
 			$coord = array_pop($this->level3_spawns_remaining);
 			if(!$coord) $coord = Camping::$level3_spawns[0];
-			s("DELAY_COMMAND +1 SPAWN_ZONE rubberadjust ".$coord." 50 -5 0 0 0");
+			s("DELAY_COMMAND +1 SPAWN_ZONE rubber ".$coord." 50 -5 0 0 -50");
 			s("DELAY_COMMAND +1 RESPAWN_PLAYER ".$player." ".$coord." 1 0");
 		}
 		if($this->player_levels[$player] > 3)
@@ -1943,6 +1922,7 @@ class Camping extends Minigame
 				return;
 			s("ADD_SCORE_PLAYER ".$alive." 5");
 			c($players[$alive]."0xffffff won 5 points for being the last alive.");
+			//BUG: Earning points in camping which causes a match win will end the game
 		}
 	}
 	function __destruct()
@@ -1961,6 +1941,7 @@ class Camping extends Minigame
 		undo("CYCLE_WALL_TIME");
 		undo("CYCLE_START_SPEED");
 		undo("EXPLOSION_RADIUS");
+		undo("CYCLE_ACCEL");
 	}
 }
 
