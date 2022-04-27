@@ -3,7 +3,7 @@
 /* Created by dukevin (dukevinjduke@gmail.com) 2022 */
 /* Requires to be started with SPAWN_SCRIPT so getenv works. +ap required*/
 /* Bugs: Some fort mode zones don't spawn like tele zones, spectators stay in $players arr*/
-/* New features to add: disco fog mode, highscores for camping, /mix for adding physics to modes, football delivery mode*/
+/* New features to add: disco fog mode, highscores for camping, /mix for adding physics to modes, football mode, rework collecting*/
 
 $dir = "/home/duke/aa/servers/sandwich/var/";
 $dessertRounds = 10;				//serve dessert (play a minigame) after this many rounds
@@ -1265,6 +1265,8 @@ class Wildfort extends Minigame
 	{
 		s("INCLUDE teams.cfg");
 		s("INCLUDE fort.cfg");
+		s("SCORE_WIN 5");
+		s("SP_SCORE_WIN 5");
 		$line = explode("|",Wildfort::$maps[mt_rand(0,sizeof(Wildfort::$maps)-1)]);
 		foreach($line as $i => $l)
 		{
@@ -1838,6 +1840,7 @@ class Dodgeball extends Minigame
 	{
 		unload("teams.cfg");
 		unload("dodgeball.cfg");
+		undo("CYCLE_RUBBER");
 	}
 }
 class Camping extends Minigame
