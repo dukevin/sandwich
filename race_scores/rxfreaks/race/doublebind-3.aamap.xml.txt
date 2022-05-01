@@ -1,3 +1,4 @@
+Magi@forums 27.5809 1 1.65112e+09
 nelg@armanelgtron.tk/Nelg 30.4845 10 1.64793e+09
 theheadhunter@forums 31.4807 2 1.6479e+09
 Obsi@forums 31.4818 15 1.64908e+09
@@ -6,6 +7,7 @@ johnny.nbk.@forums 32.0536 3 1.64794e+09
 Boxed@forums 34.0399 3 1.65067e+09
 ct_drg 34.4298 1 1.64725e+09
 nubbin 34.7088 1 1.65078e+09
+rx~wiz 35.5113 2 1.65112e+09
 wyatt 35.6501 1 1.64775e+09
 snip 35.6729 6 1.64725e+09
 speed_for_weaks 45.7413 1 1.6474e+09

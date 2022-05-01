@@ -2,7 +2,7 @@
 <?php
 /* Created by dukevin (dukevinjduke@gmail.com) 2022 */
 /* Requires to be started with SPAWN_SCRIPT so getenv works. +ap required*/
-/* Bugs: Some fort mode zones don't spawn like tele zones, spectators stay in $players arr*/
+/* Bug: entered as spectator should allow seeing stats, workaround: login only displays stats doesn't update player array, rely on player_renamed event */
 /* New features to add: disco fog mode, highscores for camping, /mix for adding physics to modes, football mode, rework collecting*/
 
 $dir = "/home/duke/aa/servers/sandwich/var/";
@@ -217,7 +217,7 @@ while(!feof(STDIN))
 		}
 		else if($p[1] == "/debug")
 		{
-			if(!is_admin($p))
+			if(!is_admin($p) && !empty($p[5]))
 				continue;
 			if(empty($p[5]))
 			{
@@ -230,20 +230,22 @@ while(!feof(STDIN))
 				$game->roundsTillDessert = ($input % $dessertRounds);
 				c("Admin: Setting dessert rounds left to ".$game->roundsTillDessert);
 			}
-			if($p[5] == "write") {
+			else if($p[5] == "write") {
 				pm($p[2], $p[2].": saving data to file");
 				writePlayerToFile($p[2], $playerStat[$p[2]]);
 			}
-			if($p[5] == "read") {
+			else if($p[5] == "read") {
 				if(!array_key_exists($p[2], $playerStat)) {
 					pm($p[2], $p[2].": reading save data");
 					$playerStat[$p[2]] = readPlayerFromFile($p[2]);
 				}
 			}
-			if($p[5] == "credits") {
+			else if($p[5] == "credits") {
 				pm($p[2], $p[2]." is cheating!");
 				$playerStat[$p[2]]->credits = $p[6];
 			}
+			else
+				pm($p[2], "No such debug command: ".$p[5]);
 		}
 		else if($p[1] == "/playlist" || $p[1] == "/minigames")
 		{
@@ -302,6 +304,7 @@ while(!feof(STDIN))
 			pm($p[2], "Invalid command ".$p[1].", try: 0xffffff/stats /ladder".$cmds);
 			if(is_admin($p, false)) {
 				if($enabled_dessert)
+					$cmd = "";
 					$cmd .= "/playlist /play /end /reshuffle /rounds_served ";
 				pm($p[2], "0x808080Admin commands: ".$cmd." /features /debug");
 			}
@@ -413,21 +416,22 @@ while(!feof(STDIN))
 		}
 		$game->cur_game->roundStart();
 	}
-	if($p[0] == "PLAYER_ENTERED_GRID" || $p[0] == "PLAYER_RENAMED") //PLAYER_ENTERED_GRID uniquename 73.134.88.149 uniqueName //PLAYER_RENAMED uniquename dukevin@rx 73.134.88.149 1 uniqueName
-	{ //BUG: A spectator who joins does not get added to the player array (no +ap event is fired)
+	if($p[0] == "PLAYER_ENTERED_GRID" || $p[0] == "PLAYER_RENAMED" || $p[0] == "PLAYER_LEAVES_SPECTATORS") //PLAYER_ENTERED_GRID uniquename 73.134.88.149 uniqueName //PLAYER_RENAMED uniquename dukevin@rx 73.134.88.149 1 uniqueName
+	{
 		$raw_name = $p[1];
 		$display_name = implode(" ",array_splice($p, 3));
+		if($p[0] == "PLAYER_LEAVES_SPECTATORS")
+			$display_name = implode(" ",array_splice($p, 2));
 		if($p[0] == "PLAYER_RENAMED") 
 		{
 			if(!array_key_exists($p[1], $players)) //if oldname is not in player array, we can assume they renamed as a spectator who entered as one
 				continue;
-			if(is_auth($p[2])) //a user logged in - handle it in PLAYER_LOGIN event
-				continue;
 			$raw_name = $p[2];
+			$p = explode(" ", $line); //not sure why this is needed
 			if($p[4] == 0) //user is not logged in 
 				pm($raw_name, "You are not logged in so renaming caused you to lose your stats since they are tied to your display name instead.");
 			$display_name = implode(" ",array_splice($p, 5));
-			if(array_key_exists($p[1], $players)) //only write if player exists and...
+			if(array_key_exists($p[1], $players) && array_key_exists($p[1], $playerStat)) //only write if player exists and...
 			{
 				if($p[4] == 1 || $playerStat[$p[1]]->time > 600) //only write logged in with 600+
 					writePlayerToFile($p[1], $playerStat[$p[1]]);
@@ -435,19 +439,20 @@ while(!feof(STDIN))
 			unset($players[$p[1]]);
 			unset($playerStat[$p[1]]);
 		}
-		$players[$raw_name] = "";
+		$players[$raw_name] = $display_name;
 		$playerStat[$raw_name] = readPlayerFromFile($raw_name);
-		printStats($raw_name, false, $display_name);
+		if($p[4] != 1) //stats were already printed when user logged in
+			printStats($raw_name, false, $display_name);
 	}
-	if($p[0] == "PLAYER_LOGIN") //PLAYER_LOGIN dog_water dukevin@rx
-	{
+	if($p[0] == "PLAYER_ENTERED_SPECTATOR") //PLAYER_ENTERED_SPECTATOR rx.duke 73.134.88.149 Rx.duke
+		$playerStat[1] = readPlayerFromFile($p[1]);
+	if($p[0] == "PLAYER_LOGIN" || $p[0] == "PLAYER_LOGOUT") //PLAYER_LOGIN dog_water dukevin@rx PLAYER_LOGOUT dukevin@rx duke
+	{	//only update playerStats array on login, update player array on player renamed event as logging in and specing same round causes bugs
 		$playerStat[$p[2]] = readPlayerFromFile($p[2]);
-		if(strlen($players[$p[2]]) == 0)
-			$players[$p[2]] = $p[1];
-		if(strlen($players[$p[1]]) == 0)
-			$players[$p[1]] = $p[1];
-		printStats($p[2], false, $players[$p[1]]);
-		unset($players[$p[1]]); 
+		if($p[0] == "PLAYER_LOGOUT")
+			writePlayerToFile($p[1], $playerStat[$p[1]]);
+		else if($p[0] == "PLAYER_LOGIN")
+			printStats($p[2], false, empty($players[$p[1]]) ? $p[1] : $players[$p[1]]);
 		unset($playerStat[$p[1]]);
 	}
 	if($p[0] == "PLAYER_AI_ENTERED")
@@ -458,12 +463,13 @@ while(!feof(STDIN))
 			continue;
 		$players[$p[1]] = implode(" ",array_splice($p,2));
 	}
-	if($p[0] == "PLAYER_LEFT")
+	if($p[0] == "PLAYER_LEFT" || $p[0] == "PLAYER_JOINS_SPECTATORS") //PLAYER_LEFT dukevin@rx 73.134.88.149 Rx.duke PLAYER_JOINS_SPECTATORS dukevin@rx Rx.duke
 	{
-		if(!array_key_exists($p[1], $playerStat))
+		if(!array_key_exists($p[1], $players)) 
 			continue;
-		$playerStat[$p[1]]->time += $game_time;
-		if(!is_auth($p[1]) && $playerStat[$p[1]]->time < 600 || !array_key_exists($p[1], $playerStat)) 
+		if($p[0] == "PLAYER_LEFT")
+			$playerStat[$p[1]]->time += $game_time;
+		if(!array_key_exists($p[1], $playerStat) || !is_auth($p[1]) && $playerStat[$p[1]]->time < 600) 
 		{ 
 			if(!array_key_exists($p[1], $playerStat))
 				c("Not saving data for ".$p[1]);
@@ -472,9 +478,10 @@ while(!feof(STDIN))
 		}
 		else {
 			printStats($p[1], false, $players[$p[1]]);
-			writePlayerToFile($p[1], $playerStat[$p[1]]);
+			writePlayerToFile($p[1], $playerStat[$p[1]]); //todo: move to player destructor
 		}
-		unset($playerStat[$p[1]]);
+		if($p[0] == "PLAYER_LEFT") //only on player_left to allow spectators to view their stats
+			unset($playerStat[$p[1]]);
 		unset($players[$p[1]]);
 	}
 	if($p[0] == "MATCH_WINNER") //MATCH_WINNER uniquename dukevin@rx MATCH_WINNER bananas hardleft stephen
@@ -658,8 +665,8 @@ class Shop
 		'/res' => ['name'=>"Respawns", 'cost'=>1, 'description'=>"Respawn any time on command", 'command'=>"/res", 'type'=>"res"],
 		'/speed' => ['name'=>"Speed", 'cost'=>1,  'description'=>"Your speed is doubled for the round", 'command'=>"/speed", 'type'=>"nonres"],
 		'/tel' => ['name'=>"Teleport", 'cost'=>1, 'description'=>"Teleport yourself. Contains 4 per purchase", 'command'=>"/tel", 'type'=>"nonres"],
-		'/now' => ['name'=>"Dessert Now", 'cost'=>3, 'description'=>"Go straight into the dessert round", 'command'=>"/now", 'type'=>"dessert"],
-		'/order'=>['name'=>"Special Order", 'cost'=>4, 'description'=>"Choose the next dessert minigame", 'command'=>"/order", 'type'=>"dessert"],
+		'/now' => ['name'=>"Dessert Now", 'cost'=>4, 'description'=>"Go straight into the dessert round", 'command'=>"/now", 'type'=>"dessert"],
+		'/order'=>['name'=>"Special Order", 'cost'=>3, 'description'=>"Choose the next dessert minigame", 'command'=>"/order", 'type'=>"dessert"],
 		'/buffet'=>['name'=>"Buffet", 'cost'=>9, 'description'=>"Choose a dessert lasting for 10 rounds", 'command'=>"/buffet", 'type'=>"dessert"]
 	];
 	static $header = " Shop ";
@@ -690,7 +697,7 @@ class Shop
 		$cost = Shop::$wares[$cmd]['cost'];
 		if($ps->credits < $cost) {
 			if(!isset($ps->credits)) {
-				pm($p, "Your stats are not loaded yet, possibly due to just logging in.");
+				pm($p, "You just logged in, wait until the next round.");
 				return false;
 			}
 			pm($p, "You don't have enough credits. $cmd costs \$".$cost." you only have $".$ps->credits);
@@ -1434,11 +1441,6 @@ class Bots extends Minigame
 	function timedEvents($time)
 	{
 		global $ais;
-		if($time % 5 == 0) 
-		{
-			foreach($ais as $a)
-				s("SET_CYCLE_RUBBER $a 12");
-		}
 		if($time >= 30)
 		{
 			if($time % 30 == 0)

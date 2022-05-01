@@ -1,5 +1,6 @@
 nelg@armanelgtron.tk/Nelg 23.9819 9 1.64794e+09
 johnny.nbk.@forums 24.0615 3 1.64794e+09
+Magi@forums 24.257 1 1.65112e+09
 Obsi@forums 24.2693 13 1.64908e+09
 wyatt 24.5942 1 1.64775e+09
 dukevin@rx 24.6055 26 1.65103e+09
@@ -9,6 +10,7 @@ nano 25.3463 1 1.65061e+09
 theheadhunter@forums 25.3682 1 1.6506e+09
 nubbin 26.2541 1 1.65078e+09
 Boxed@forums 26.393 3 1.65061e+09
+pdbq@rx 26.7589 1 1.65112e+09
 boxed 27.2956 1 1.65061e+09
 dBdNano@forums 29.1663 1 1.64776e+09
 #paix 31.784 1 1.64772e+09
