@@ -2,8 +2,8 @@
 <?php
 /* Created by dukevin (dukevinjduke@gmail.com) 2022 */
 /* Requires to be started with SPAWN_SCRIPT so getenv works. +ap required*/
-/* Bug: entered as spectator should allow seeing stats, workaround: login only displays stats doesn't update player array, rely on player_renamed event */
-/* New features to add: disco fog mode, highscores for camping, /mix for adding physics to modes, football mode, rework collecting*/
+/* Bugs:  None known*/
+/* New features to add: highscores for camping, /mix for adding physics to modes, football mode*/
 
 $dir = "/home/duke/aa/servers/sandwich/var/";
 $dessertRounds = 10;				//serve dessert (play a minigame) after this many rounds
@@ -639,7 +639,7 @@ class PlayerStat
 {
 	public function __construct() 
 	{
-		$this->credits = 0;
+		$this->credits = 5;
 		$this->kills = 0;
 		$this->deaths = 0;
 		$this->time = 0;
