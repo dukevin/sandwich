@@ -3,7 +3,7 @@
 /* Created by dukevin (dukevinjduke@gmail.com) 2022 */
 /* Requires to be started with SPAWN_SCRIPT so getenv works. +ap required*/
 /* Bugs:  None known*/
-/* New features to add: highscores for camping, /mix for adding physics to modes, football mode*/
+/* New features to add: highscores for camping, /mix for adding physics to modes, football mode, players can set bounties*/
 
 $dir = "/home/duke/aa/servers/sandwich/var/";
 $dessertRounds = 10;				//serve dessert (play a minigame) after this many rounds
@@ -31,6 +31,7 @@ $bounty = null;
 $time_last = strtotime("00:00:00");
 
 c(basename(__FILE__)." started succesfully");
+s("RESOURCE_REPOSITORY_SERVER http://rxtron.com/aa/resource/");
 while(!feof(STDIN))
 {
 	$line = rtrim(fgets(STDIN));
@@ -265,6 +266,7 @@ while(!feof(STDIN))
 			}
 			$p[5] = round(abs($p[5]));
 			$dessertRounds = $p[5];
+			$this->roundsTillDessert = $p[5];
 			c("Dessert is now served every ".$dessertRounds." rounds.");
 		}
 		else if($p[1] == "/features") 
@@ -279,7 +281,7 @@ while(!feof(STDIN))
 				pm($p[2], "Current features:");
 				foreach($settings as $i=>$s)
 					pm($p[2], ($i+1).") ".$s." ".($$s ? $enabled : $disabled));
-				c("Usage: /features <line #>");
+				pm($p[2], "Usage: /features <line #>");
 				continue;
 			}
 			$p[5] -= 1;
@@ -592,7 +594,8 @@ function writePlayerToFile($player, $playerStat)
 		writePlayerToFile($player, $playerStat);
 	}
 	if(!is_a($playerStat, "PlayerStat")) {
-		c("Not saving corrupt savedata for $player");
+		if(!empty($playerStat))
+			c("Not saving corrupt savedata for $player");
 		return;
 	}
 	$lines = explode("\n", $contents);
@@ -808,7 +811,7 @@ class GameManager
 {
 	private static $instance = null;
 	public $cur_game;
-	public static $games_list = ["shooting", "map", "axes", "sumo", "fort", "wildfort", "nano", "htf", "koh", "dz", "collecting", "turbo", "pets", "teams", "ctf", "macro", "bots", "longwall", "bone", "classic", "bombs", "reflex", "dodgeball", "camping"];
+	public static $games_list = ["shooting", "map", "axes", "sumo", "fort", "wildfort", "nano", "htf", "koh", "dz", "collecting", "turbo", "pets", "teams", "ctf", "macro", "bots", "longwall", "bone", "classic", "bombs", "reflex", "dodgeball", "camping", "flipped"];
 	public static $match_ends_games = ["ctf", "htf", "fort"]; //games which end when the match does instead of 10 rounds
 	private $games_available;
 	public $roundsPlayed;
@@ -975,6 +978,7 @@ class None extends Minigame
 	static $description = "Normal play";
 	function __construct()
 	{	//just some essential settings in case something doesn't get set back right
+		s("WIN_ZONE_MIN_ROUND_TIME 300");
 		s("SCORE_KILL 2");
 		s("ARENA_AXES 4");
 		s("SIZE_FACTOR -3");
@@ -1151,7 +1155,7 @@ class Map extends Minigame
 	static $description = "Same game, different map. ";
 	static $maps = array(
 		"arrow-290712", "button-020413", "chico-120714", "chimney-270612", "circle-240511", "cross-090714", "curse-090714", "diablo-120712", "dots-180814", "dumbbell-050714", "eight-100714",
-		"eihwaz-280712", "flipped-150213", "flux-090714", "hexatron-100714", "hexawarp-190213", "honeycomb-100714", "magnet-090714", "molecule-100714", "octatron-100714", "octawarp-100414",
+		"eihwaz-280712", "flux-090714", "hexatron-100714", "hexawarp-190213", "honeycomb-100714", "magnet-090714", "molecule-100714", "octatron-100714", "octawarp-100414",
 		"orbit-100714", "pause-110714", "pentagon-080714",  "prism-110714", "racetrack-070814", "rhombus-110714", "ring-110714", "room-260511", "shift-110714", "silo-110714", "sixpetals-110714",
 		"spiral-110714", "star-120714", "tetrawarp-190213", "tiles-270612", "triangle-120714", "void-050712", "wave-060714", "window-120714", "zet-250511", "zone-160313", "barrier-2",
 		"boxes-3", "compass-4", "donut-3", "hexagon-1", "pillars-3", "plus-1", "redicle-1", "rooms-3", "star-3"
@@ -1947,6 +1951,25 @@ class Camping extends Minigame
 		undo("CYCLE_START_SPEED");
 		undo("EXPLOSION_RADIUS");
 		undo("CYCLE_ACCEL");
+	}
+}
+
+class Flipped extends Minigame
+{
+	static $display_name = "Flipped";
+	static $description = "Your controls are reversed!";
+	function __construct()
+	{
+		s("MAP_FILE Wik/dogfight/flipped-150213.aamap.xml");
+		s("SIZE_FACTOR -1");
+		s("SP_SIZE_FACTOR -1");
+
+	}
+	function __destruct()
+	{
+		s("MAP_FILE Anonymous/polygon/regular/square-1.0.1.aamap.xml");
+		s("SIZE_FACTOR -3");
+		s("SP_SIZE_FACTOR -3");
 	}
 }
 
