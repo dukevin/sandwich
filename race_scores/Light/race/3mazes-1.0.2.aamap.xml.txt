@@ -1,4 +1,4 @@
-nelg@armanelgtron.tk/Nelg 17.7654 13 1.64834e+09
+nelg@armanelgtron.tk/Nelg 17.7654 15 1.65232e+09
 ct_drg 17.7978 1 1.64725e+09
 Magi@forums 17.9223 3 1.65112e+09
 johnny.nbk.@forums 17.9724 3 1.64794e+09
@@ -8,8 +8,9 @@ jam 18.2281 1 1.6479e+09
 Boxed@forums 18.313 4 1.65067e+09
 Obsi@forums 18.3903 7 1.64932e+09
 snip 18.5503 3 1.64725e+09
+theheadhunter@forums 18.9018 2 1.65232e+09
 nubbin 19.3764 1 1.64862e+09
-theheadhunter@forums 19.5682 1 1.64792e+09
+wiz 19.5507 1 1.65232e+09
 wyatt 19.7902 1 1.64775e+09
 mouse 19.8959 1 1.6474e+09
 {omg}headhunter 20.166 1 1.6479e+09
